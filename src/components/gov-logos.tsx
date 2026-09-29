@@ -22,6 +22,7 @@ export const GOV_LOGOS: LogoSpec[] = [
   { src: ["/assets/mosje-logo.png", "/assets/mosje-logo.svg"], label: "MoSJE", caption: "Social Justice & Empowerment" },
   { src: ["/assets/skill-india.png", "/assets/skill-india.svg"], label: "Skill India", caption: "Kaushal Bharat" },
   { src: ["/assets/nsdc-logo.png", "/assets/nsdc-logo.svg"], label: "NSDC", caption: "Skill Development" },
+  { src: ["/assets/nsqf-logo.png", "/assets/nsqf-logo.svg"], label: "NSQF", caption: "National Skills Qualifications Framework" },
   { src: ["/assets/digital-india.png", "/assets/digital-india.svg"], label: "Digital India", caption: "Power to Empower" },
 ];
 

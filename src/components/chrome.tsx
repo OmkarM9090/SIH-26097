@@ -122,10 +122,7 @@ export function GovHeader({ lang, onLang }: { lang: LangCode; onLang: (l: LangCo
             className="hidden h-11 shrink-0 sm:block"
           />
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-navy-900 text-white">
-              <Chakra className="h-8 w-8" color="#ffffff" />
-              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-saffron-500" />
-            </div>
+            <img src="/assets/final_logo.svg" alt="JeevikaSetu" className="h-11 w-11 object-contain drop-shadow-sm" />
             <div className="min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="truncate text-lg font-extrabold tracking-tight text-navy-900">JeevikaSetu</span>
@@ -215,7 +212,7 @@ export function GovFooter() {
       <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 text-sm md:grid-cols-4">
         <div>
           <div className="flex items-center gap-2">
-            <Chakra className="h-7 w-7" color="#003366" />
+            <img src="/assets/final_logo.svg" alt="JeevikaSetu" className="h-7 w-7 object-contain" />
             <div>
               <p className="text-sm font-extrabold text-navy-900">JeevikaSetu</p>
               <p className="text-[11px] font-semibold text-slate-500">जीविकासेतु</p>
@@ -252,10 +249,6 @@ export function GovFooter() {
         <p>
           © {year} JeevikaSetu · Working prototype for Smart India Hackathon 2026 ·
           Problem Statement 26097 · Ministry of Social Justice &amp; Empowerment.
-        </p>
-        <p className="mt-1 text-white/45">
-          Demonstration build with curated sample data. Logos shown are placeholders pending
-          official artwork and are not an endorsement.
         </p>
       </div>
     </footer>
