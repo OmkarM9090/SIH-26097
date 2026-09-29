@@ -3,7 +3,7 @@
 // Pipeline per turn:
 //   user text → language confirm/detect → slot extraction (deterministic NLU)
 //   → GPT-4o phrasing when keyed (fallback: scripted empathetic replies)
-//   → persist transcript/slots/stage in PostgreSQL → JSON reply for TTS.
+//   → persist transcript/slots/stage in MongoDB → JSON reply for TTS.
 import { getDb } from "@/db";
 import { ObjectId } from "mongodb";
 import type { Channel, ChatTurn, ConversationReply, LangCode, SlotState, Stage } from "@/lib/types";

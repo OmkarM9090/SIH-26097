@@ -1,32 +1,27 @@
 import { MongoClient } from "mongodb";
 
 const uri = process.env.MONGODB_URL;
-
-if (!uri) {
-  throw new Error("Please add your Mongo URI to .env");
-}
-
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
+const dbName = process.env.MONGODB_DB ?? "jeevikasetu";
 
 const globalForMongo = globalThis as typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;
 };
 
-if (process.env.NODE_ENV === "development") {
+/** Lazily connect so `next build` and static pages work without secrets. */
+function getClientPromise(): Promise<MongoClient> {
+  if (!uri) {
+    throw new Error("MONGODB_URL is not configured. Add it to .env.local before using persistence APIs.");
+  }
   if (!globalForMongo._mongoClientPromise) {
-    client = new MongoClient(uri);
+    const client = new MongoClient(uri);
     globalForMongo._mongoClientPromise = client.connect();
   }
-  clientPromise = globalForMongo._mongoClientPromise;
-} else {
-  client = new MongoClient(uri);
-  clientPromise = client.connect();
+  return globalForMongo._mongoClientPromise;
 }
 
 export async function getDb() {
-  const c = await clientPromise;
-  return c.db("jeevikasetu");
+  const client = await getClientPromise();
+  return client.db(dbName);
 }
 
-export default clientPromise;
+export default getClientPromise;

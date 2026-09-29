@@ -1,0 +1,28 @@
+You are extracting a beneficiary profile from a real JeevikaSetu conversation.
+Extract ONLY information explicitly stated or directly evidenced by the user's messages. Never invent computer skills, education, location, age, income, or constraints.
+
+Conversation:
+{conversation}
+
+Existing profile:
+{current_profile}
+
+Return valid JSON only. Preserve existing values when the user did not update them. Use null for fields not mentioned. Skills must be skills the user actually described doing or clearly practising. Generate insights only from evidence in the conversation. For example, farming may support an agri-skilling suggestion; leather work may support RPL for leather craft. Do not stereotype or infer caste-based skills.
+
+Schema:
+{
+  "name": null,
+  "location": {"village": null, "district": null, "state": null},
+  "age": null,
+  "education_level": null,
+  "family_occupation": null,
+  "current_work": null,
+  "work_independence": null,
+  "skills": [],
+  "interests": [],
+  "mobility_range_km": null,
+  "employment_preference": null,
+  "constraints": [],
+  "languages_spoken": [],
+  "insights": null
+}

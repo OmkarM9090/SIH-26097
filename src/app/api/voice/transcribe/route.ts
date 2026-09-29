@@ -12,12 +12,18 @@ export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const audio = form.get("audio");
+    const requestedLanguage = String(form.get("language") ?? "").trim();
     if (!(audio instanceof Blob)) {
       return Response.json({ error: "audio file required" }, { status: 400 });
     }
+    // Whisper accepts the browser's WebM/Opus blob directly; do not attempt
+    // to parse it as text or convert it in the browser.
     const result = await whisperTranscribe(audio, "speech.webm");
     if (!result) return Response.json({ error: "transcription failed" }, { status: 502 });
-    return Response.json(result);
+    return Response.json({
+      text: result.text,
+      detected_language: result.language ?? requestedLanguage ?? "unknown",
+    });
   } catch (e) {
     return Response.json({ error: "transcription error", detail: String(e) }, { status: 500 });
   }

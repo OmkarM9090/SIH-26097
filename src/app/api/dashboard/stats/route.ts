@@ -43,6 +43,9 @@ export async function GET() {
     const qpCount = new Map<string, number>();
     let rplCount = 0;
     let recTotal = 0;
+    let scoreTotal = 0;
+    let scoreCount = 0;
+    let giaLinked = 0;
     for (const r of recRows) {
       const list = (r.results as unknown as RecommendationResult[]) ?? [];
       for (const it of list.slice(0, 3)) {
@@ -50,12 +53,23 @@ export async function GET() {
         qpCount.set(it.qp.name, (qpCount.get(it.qp.name) ?? 0) + 1);
       }
       if (list.some((it) => it.rplEligible)) rplCount++;
+      if (list.some((it) => it.gia?.length)) giaLinked++;
+      for (const it of list) {
+        const score = Number(it.skillOverlapPct ?? it.score ?? 0);
+        if (Number.isFinite(score)) { scoreTotal += score; scoreCount++; }
+      }
       recTotal++;
     }
 
     return Response.json({
       total,
+      total_beneficiaries: total,
       recommendationSets: recTotal,
+      total_recommendations: recTotal,
+      avgSkillMatchScore: scoreCount ? Math.round(scoreTotal / scoreCount) : 0,
+      avg_skill_match_score: scoreCount ? Math.round(scoreTotal / scoreCount) : 0,
+      giaBenefitsLinked: giaLinked,
+      gia_benefits_linked: giaLinked,
       rplEligibleShare: recTotal ? Math.round((rplCount / recTotal) * 100) : 0,
       rplConversionRate: recTotal ? Math.round((rplCount / recTotal) * 100) : 0, // Duplicate of eligible for now
       avgDurationMins: "4.2", // Mocked value

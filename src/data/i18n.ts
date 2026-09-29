@@ -161,8 +161,8 @@ export const QUESTIONS: Record<Exclude<Stage, "done">, StageText> = {
     bn: "বুঝলাম। আপনি কতটা পড়াশোনা করেছেন? যেমন ৫ম, ৮ম, ১০ম বা বেশি?",
   },
   family_occupation: {
-    hi: "आपके परिवार का परंपरागत काम क्या है? पिता-दादा क्या काम करते थे?",
-    en: "What is your family's traditional work? What did your father or grandfather do?",
+    hi: "क्या आपका काम आपके परिवार के पारंपरिक काम से जुड़ा है, या आप अपना अलग काम करते हैं?",
+    en: "Is your work related to your family's traditional occupation, or do you do independent work?",
     ta: "உங்கள் குடும்பத்தின் பாரம்பரிய தொழில் என்ன? உங்கள் தந்தை என்ன வேலை செய்தார்?",
     te: "మీ కుటుంబం యొక్క సాంప్రదాయ వృత్తి ఏమిటి? మీ తండ్రి లేదా తాత ఏ పని చేసేవారు?",
     mr: "तुमच्या कुटुंबाचे पारंपरिक काम काय? वडील-आजोबा काय काम करत?",

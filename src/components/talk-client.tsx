@@ -43,6 +43,7 @@ export default function TalkClient({
   const [typed, setTyped] = useState("");
   const [sttMode, setSttMode] = useState<"whisper" | "webspeech">("webspeech");
   const [micMode, setMicMode] = useState<"ptt" | "continuous">("ptt");
+  const micModeRef = useRef<"ptt" | "continuous">("ptt");
   const [aiPowered, setAiPowered] = useState(false);
   const [muted, setMuted] = useState(false);
   const [beneficiaryId, setBeneficiaryId] = useState<string | null>(null);
@@ -241,25 +242,26 @@ export default function TalkClient({
   // ------------------------------------------------------------- mic control
   const startListening = async () => {
     setErrorMsg("");
-    if (sttMode === "webspeech" && browserSTT) {
-      const handle = listen(lang, {
-        onInterim: (tx) => { setInterim(tx); scrollBottom(); },
-        onFinal: async (tx) => { setInterim(""); await sendTurn(tx); },
-        onEnd: () => { setStatus((s) => (s === "listening" ? "idle" : s)); stopViz(); },
-        onError: () => { setStatus("idle"); stopViz(); },
-      });
-      if (!handle) { setErrorMsg("Mic unavailable — please type below"); return; }
-      listenRef.current = handle;
-      setStatus("listening");
-      // ambient viz even without analyser — use mic stream when permitted
-      void attachStreamViz();
+    // Always record a real WebM/Opus clip first. Browser SpeechRecognition is
+    // not reliable on Firefox/Safari and, previously, silently bypassed the
+    // MediaRecorder/Whisper path. This makes the microphone behaviour the same
+    // in every supported browser.
+    const stream = await getMicStream();
+    if (!stream) {
+      setErrorMsg("Microphone permission was denied. Allow microphone access and try again.");
+      setStatus("error");
       return;
     }
-    // whisper path: press to record → release handled by stopListening
-    const stream = await getMicStream();
-    if (!stream) { setErrorMsg("Mic permission denied — please type below"); return; }
     streamRef.current = stream;
-    recRef.current = record(stream);
+    try {
+      recRef.current = record(stream);
+    } catch {
+      stream.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      setErrorMsg("This browser cannot record audio. Please type your answer instead.");
+      setStatus("error");
+      return;
+    }
     setStatus("listening");
     void attachStreamViz();
   };
@@ -292,12 +294,34 @@ export default function TalkClient({
       try {
         const fd = new FormData();
         fd.append("audio", blob, "speech.webm");
+        fd.append("language", lang);
         const res = await fetch("/api/voice/transcribe", { method: "POST", body: fd });
         if (!res.ok) throw new Error("STT failed");
         const data = (await res.json()) as { text?: string };
-        if (data.text) await sendTurn(data.text);
-        else setStatus("idle");
+        if (data.text) {
+          setInterim(data.text); // subtitle: show exactly what Whisper heard
+          await sendTurn(data.text);
+          if (micModeRef.current === "continuous" && status !== "done") {
+            // Continuous mode listens again after the assistant finishes speaking.
+            await startListening();
+          }
+        } else setStatus("idle");
       } catch {
+        // A configured Whisper endpoint is the primary path. Keep the demo
+        // usable without an API key by falling back to the browser recognizer.
+        if (browserSTT) {
+          const handle = listen(lang, {
+            onInterim: (tx) => setInterim(tx),
+            onFinal: async (tx) => {
+              setInterim("");
+              await sendTurn(tx);
+              if (micModeRef.current === "continuous") await startListening();
+            },
+            onEnd: () => setStatus("idle"),
+            onError: () => { setErrorMsg("Could not transcribe — please type your answer"); setStatus("idle"); },
+          });
+          if (handle) { listenRef.current = handle; setStatus("listening"); return; }
+        }
         setErrorMsg("Could not transcribe — please try again or type");
         setStatus("idle");
       }
@@ -380,7 +404,7 @@ export default function TalkClient({
             </div>
             <div className="flex items-center justify-between pt-2 text-[11px] text-slate-400">
               <span>Mic Mode:</span>
-              <button onClick={() => setMicMode((m) => (m === "ptt" ? "continuous" : "ptt"))} className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-600">
+              <button onClick={() => setMicMode((m) => { const next = m === "ptt" ? "continuous" : "ptt"; micModeRef.current = next; return next; })} className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-600">
                 {micMode === "ptt" ? "Push to Talk" : "Continuous"}
               </button>
             </div>
