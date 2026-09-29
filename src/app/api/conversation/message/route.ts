@@ -68,10 +68,11 @@ export async function POST(req: Request) {
     const userText = (body.userText ?? "").trim();
     if (!userText) return Response.json({ error: "userText required" }, { status: 400 });
 
-    // Language: honour explicit choice; otherwise detect script (mr collapses to hi by script only)
+    // Language: the client is the source of truth (the beneficiary can switch
+    // languages mid-interview); script detection only fills in when the client
+    // did not state one.
     const detected = detectLanguage(userText);
-    const effLang: LangCode =
-      body.lang && body.lang !== "hi" ? lang : asLang(detected === "en" ? lang : detected, lang);
+    const effLang: LangCode = body.lang ? lang : asLang(detected, (row.language as LangCode) ?? lang);
 
     transcript.push({ role: "user", text: userText, lang: effLang, at: Date.now() });
 
@@ -131,7 +132,7 @@ export async function POST(req: Request) {
 
     await db.collection("conversations").updateOne(
       { _id: qId as any },
-      { $set: { transcript: transcript, slots: slots, stage, done, updatedAt: new Date() } }
+      { $set: { transcript: transcript, slots: slots, stage, done, language: effLang, updatedAt: new Date() } }
     );
 
     const out: ConversationReply = {

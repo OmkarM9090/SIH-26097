@@ -243,3 +243,56 @@ export const IVR_MENU: Record<LangCode, string> = {
   mr: "PM-AJAY जीविकासेतूमध्ये स्वागत. मराठीसाठी 5 दाबा.",
   bn: "PM-AJAY জীবিকাসেতুতে স্বাগতম। বাংলার জন্য 6 চাপুন।",
 };
+
+// ---------------------------------------------- interview stage labels (6 languages)
+export const STAGE_LABELS_ML: Record<Exclude<Stage, never>, Record<LangCode, string>> = {
+  name: { hi: "नाम", en: "Name", ta: "பெயர்", te: "పేరు", mr: "नाव", bn: "নাম" },
+  location: { hi: "स्थान", en: "Location", ta: "இடம்", te: "ప్రాంతం", mr: "ठिकाण", bn: "অবস্থান" },
+  education: { hi: "शिक्षा", en: "Education", ta: "கல்வி", te: "విద్య", mr: "शिक्षण", bn: "শিক্ষা" },
+  family_occupation: { hi: "पारिवारिक काम", en: "Family work", ta: "குடும்பத் தொழில்", te: "కుటుంబ వృత్తి", mr: "कौटुंबिक काम", bn: "পারিবারিক কাজ" },
+  current_livelihood: { hi: "वर्तमान काम", en: "Current work", ta: "தற்போதைய வேலை", te: "ప్రస్తుత పని", mr: "सध्याचे काम", bn: "বর্তমান কাজ" },
+  interests: { hi: "रुचि", en: "Interests", ta: "ஆர்வம்", te: "ఆసక్తులు", mr: "आवड", bn: "আগ্রহ" },
+  employment: { hi: "नौकरी / स्वरोज़गार", en: "Job or own work", ta: "வேலை / சொந்தத் தொழில்", te: "ఉద్యోగం / స్వయం ఉపాధి", mr: "नोकरी / स्वयंरोजगार", bn: "চাকরি / স্বনির্ভর" },
+  mobility: { hi: "यात्रा सीमा", en: "Travel range", ta: "பயண தூரம்", te: "ప్రయాణ పరిధి", mr: "प्रवास मर्यादा", bn: "যাত্রার পরিসীমা" },
+  physical: { hi: "बाधाएँ", en: "Constraints", ta: "தடைகள்", te: "పరిమితులు", mr: "मर्यादा", bn: "সীমাবদ্ধতা" },
+  confirm: { hi: "पुष्टि", en: "Confirmation", ta: "உறுதிப்படுத்தல்", te: "నిర్ధారణ", mr: "पुष्टी", bn: "নিশ্চিতকরণ" },
+  done: { hi: "पूर्ण", en: "Done", ta: "முடிந்தது", te: "పూర్తి", mr: "पूर्ण", bn: "সম্পন্ন" },
+};
+
+export function stageLabel(stage: Stage, lang: LangCode): string {
+  return STAGE_LABELS_ML[stage]?.[lang] ?? STAGE_LABELS_ML[stage]?.en ?? stage;
+}
+
+// ------------------------------------------------- extra talk-screen strings
+type ExtraKey =
+  | "hold_speak" | "tap_speak_btn" | "listening_now" | "replay" | "interview"
+  | "voice_on" | "voice_off" | "mic_mode" | "ptt" | "continuous" | "profile_ready"
+  | "mic_denied" | "stt_unsupported" | "no_speech" | "stt_failed" | "retry"
+  | "lang_switched" | "ai_live" | "ai_offline" | "connecting";
+
+export const EXTRA: Record<ExtraKey, Record<LangCode, string>> = {
+  interview: { hi: "साक्षात्कार", en: "Interview", ta: "நேர்காணல்", te: "ఇంటర్వ్యూ", mr: "मुलाखत", bn: "সাক্ষাৎকার" },
+  hold_speak: { hi: "बोलने के लिए दबाए रखें", en: "Hold to Speak", ta: "பேச அழுத்திப் பிடிக்கவும்", te: "మాట్లాడటానికి నొక్కి పట్టుకోండి", mr: "बोलण्यासाठी दाबून धरा", bn: "বলতে চেপে ধরুন" },
+  tap_speak_btn: { hi: "बोलने के लिए दबाएँ", en: "Tap to Speak", ta: "பேச தட்டவும்", te: "మాట్లాడటానికి నొక్కండి", mr: "बोलण्यासाठी दाबा", bn: "বলতে চাপুন" },
+  listening_now: { hi: "सुन रहे हैं…", en: "Listening…", ta: "கேட்கிறது…", te: "వింటోంది…", mr: "ऐकत आहे…", bn: "শুনছি…" },
+  replay: { hi: "दोबारा सुनें", en: "Replay", ta: "மீண்டும் கேட்க", te: "మళ్లీ వినండి", mr: "पुन्हा ऐका", bn: "আবার শুনুন" },
+  voice_on: { hi: "आवाज़: चालू", en: "Voice: on", ta: "குரல்: இயக்கம்", te: "వాయిస్: ఆన్", mr: "आवाज: चालू", bn: "ভয়েস: চালু" },
+  voice_off: { hi: "आवाज़: बंद", en: "Voice: off", ta: "குரல்: நிறுத்தம்", te: "వాయిస్: ఆఫ్", mr: "आवाज: बंद", bn: "ভয়েস: বন্ধ" },
+  mic_mode: { hi: "माइक मोड", en: "Mic mode", ta: "மைக் முறை", te: "మైక్ మోడ్", mr: "माईक मोड", bn: "মাইক মোড" },
+  ptt: { hi: "दबाकर बोलें", en: "Push to talk", ta: "அழுத்திப் பேசு", te: "నొక్కి మాట్లాడు", mr: "दाबून बोला", bn: "চেপে বলুন" },
+  continuous: { hi: "लगातार", en: "Continuous", ta: "தொடர்ச்சியாக", te: "నిరంతరం", mr: "सतत", bn: "একটানা" },
+  profile_ready: { hi: "आपकी प्रोफ़ाइल तैयार है!", en: "Your profile is ready!", ta: "உங்கள் சுயவிவரம் தயார்!", te: "మీ ప్రొఫైల్ సిద్ధం!", mr: "तुमची प्रोफाइल तयार आहे!", bn: "আপনার প্রোফাইল প্রস্তুত!" },
+  mic_denied: { hi: "माइक की अनुमति नहीं मिली। कृपया ब्राउज़र में माइक चालू करें।", en: "Microphone permission denied. Please allow mic access and try again.", ta: "மைக் அனுமதி மறுக்கப்பட்டது. மைக்கை அனுமதிக்கவும்.", te: "మైక్ అనుమతి నిరాకరించబడింది. మైక్‌ను అనుమతించండి.", mr: "माईक परवानगी नाकारली. कृपया माईक सुरू करा.", bn: "মাইক অনুমতি দেওয়া হয়নি। মাইক চালু করুন।" },
+  stt_unsupported: { hi: "इस ब्राउज़र में आवाज़ पहचान नहीं है — कृपया टाइप करें", en: "Speech recognition is not supported here — please type instead", ta: "இந்த உலாவியில் பேச்சு அறிதல் இல்லை — தட்டச்சு செய்யவும்", te: "ఈ బ్రౌజర్‌లో స్పీచ్ గుర్తింపు లేదు — టైప్ చేయండి", mr: "या ब्राउझरमध्ये आवाज ओळख नाही — कृपया टाइप करा", bn: "এই ব্রাউজারে স্পিচ শনাক্তকরণ নেই — টাইপ করুন" },
+  no_speech: { hi: "कुछ सुनाई नहीं दिया — फिर से बोलिए", en: "I didn't catch that — please speak again", ta: "எதுவும் கேட்கவில்லை — மீண்டும் பேசுங்கள்", te: "ఏమీ వినిపించలేదు — మళ్లీ మాట్లాడండి", mr: "काही ऐकू आले नाही — पुन्हा बोला", bn: "কিছু শুনতে পাইনি — আবার বলুন" },
+  stt_failed: { hi: "आवाज़ समझ नहीं पाए — फिर कोशिश करें या टाइप करें", en: "Could not transcribe — try again or type", ta: "புரியவில்லை — மீண்டும் முயற்சிக்கவும்", te: "అర్థం కాలేదు — మళ్లీ ప్రయత్నించండి", mr: "समजले नाही — पुन्हा प्रयत्न करा", bn: "বুঝতে পারিনি — আবার চেষ্টা করুন" },
+  retry: { hi: "फिर कोशिश करें", en: "Retry", ta: "மீண்டும்", te: "మళ్లీ", mr: "पुन्हा", bn: "আবার" },
+  lang_switched: { hi: "भाषा बदली गई", en: "Language switched", ta: "மொழி மாற்றப்பட்டது", te: "భాష మార్చబడింది", mr: "भाषा बदलली", bn: "ভাষা পরিবর্তিত" },
+  ai_live: { hi: "AI: GPT-4o लाइव", en: "AI: GPT-4o live", ta: "AI: GPT-4o நேரலை", te: "AI: GPT-4o లైవ్", mr: "AI: GPT-4o लाइव्ह", bn: "AI: GPT-4o লাইভ" },
+  ai_offline: { hi: "AI: ऑन-डिवाइस इंजन", en: "AI: on-device engine", ta: "AI: சாதன இயந்திரம்", te: "AI: ఆన్-డివైస్ ఇంజిన్", mr: "AI: ऑन-डिव्हाइस इंजिन", bn: "AI: অন-ডিভাইস ইঞ্জিন" },
+  connecting: { hi: "जुड़ रहे हैं…", en: "Connecting…", ta: "இணைக்கிறது…", te: "కనెక్ట్ అవుతోంది…", mr: "जोडत आहे…", bn: "সংযোগ হচ্ছে…" },
+};
+
+export function tx(key: ExtraKey, lang: LangCode): string {
+  return EXTRA[key]?.[lang] ?? EXTRA[key]?.en ?? key;
+}
