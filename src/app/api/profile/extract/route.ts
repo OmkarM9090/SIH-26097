@@ -1,5 +1,5 @@
 // POST /api/profile/extract — conversation slots → structured BeneficiaryProfile
-// (Module 3 output), persisted to PostgreSQL as a beneficiary record.
+// (Module 3 output), persisted to MongoDB as a beneficiary record.
 import { getDb } from "@/db";
 import { ObjectId } from "mongodb";
 import type { Channel, LangCode, SlotState } from "@/lib/types";

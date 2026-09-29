@@ -146,7 +146,10 @@ export interface RecorderHandle {
 
 /** MediaRecorder wrapper used when server Whisper STT is available. */
 export function record(stream: MediaStream): RecorderHandle {
-  const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+  // Chromium's Whisper-compatible container. Safari may not advertise WebM,
+  // so choose its native format instead of failing microphone capture.
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+  const mime = candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
   const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
   const chunks: BlobPart[] = [];
   mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
@@ -163,7 +166,16 @@ export function record(stream: MediaStream): RecorderHandle {
 
 export async function getMicStream(): Promise<MediaStream | null> {
   try {
-    return await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!navigator.mediaDevices?.getUserMedia) return null;
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 16000,
+        channelCount: 1,
+      },
+    });
   } catch {
     return null;
   }

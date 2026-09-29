@@ -63,13 +63,21 @@ export function applyAnswer(slots: SlotState, stage: Stage, text: string, lang: 
       break;
     }
     case "family_occupation": {
-      s.familyOccupation = text.trim();
-      s.familySkills = scanSkills(text);
+      // This stage intentionally asks about the nature of work first. The
+      // answer controls the next wording; we never assume family work.
+      const family = /(family|traditional|father|parents|परिवार|पारंपरिक|पिता|घर का|परम्परा|குடும்ப|కుటుంబ|कुटुंब|পরিবার)/i.test(text);
+      s.work_independence = family ? "family_business" : "independent";
       break;
     }
     case "current_livelihood": {
-      s.currentLivelihood = text.trim();
-      s.currentSkills = scanSkills(text);
+      const skills = scanSkills(text);
+      if (s.work_independence === "family_business") {
+        s.familyOccupation = text.trim();
+        s.familySkills = skills;
+      } else {
+        s.currentLivelihood = text.trim();
+        s.currentSkills = skills;
+      }
       const age = parseAge(text);
       if (age) s.age = age;
       break;
@@ -129,6 +137,21 @@ export function fallbackStep(slots: SlotState, stage: Stage, userText: string, l
   const next = STAGES[Math.min(idx + 1, STAGES.length - 1)];
 
   const updated = applyAnswer(slots, stage, userText, lang);
+
+  // Branch immediately after the work-nature answer. The next answer is
+  // stored as family occupation or independent livelihood by applyAnswer.
+  if (stage === "family_occupation") {
+    const family = updated.work_independence === "family_business";
+    const branch: Record<LangCode, string> = {
+      hi: family ? "बहुत अच्छा! आपके परिवार का पारंपरिक काम क्या है? आप उसमें क्या काम करते हैं?" : "बहुत अच्छा! आप क्या काम करते हैं? रोज़ क्या करते हैं?",
+      en: family ? "Very good! What is your family's traditional work, and what do you do in it?" : "Very good! What work do you do? What do you do each day?",
+      ta: family ? "மிகவும் நல்லது! உங்கள் குடும்பத்தின் பாரம்பரிய வேலை என்ன?" : "மிகவும் நல்லது! நீங்கள் என்ன வேலை செய்கிறீர்கள்?",
+      te: family ? "చాలా బాగుంది! మీ కుటుంబ సంప్రదాయ పని ఏమిటి?" : "చాలా బాగుంది! మీరు ఏ పని చేస్తున్నారు?",
+      mr: family ? "खूप छान! तुमच्या कुटुंबाचे पारंपरिक काम काय आहे?" : "खूप छान! तुम्ही कोणते काम करता?",
+      bn: family ? "খুব ভালো! আপনার পরিবারের ঐতিহ্যবাহী কাজ কী?" : "খুব ভালো! আপনি কী কাজ করেন?",
+    };
+    return { reply: branch[lang] ?? branch.en, slots: updated, stage: "current_livelihood", done: false };
+  }
 
   if (next === "confirm") {
     const summary = buildSummary(updated, lang);
