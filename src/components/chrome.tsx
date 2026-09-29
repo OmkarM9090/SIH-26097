@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { LANGS } from "@/data/i18n";
+import { GovLogo, GOV_LOGOS } from "@/components/gov-logos";
 import type { LangCode } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -116,6 +117,10 @@ export function GovHeader({ lang, onLang }: { lang: LangCode; onLang: (l: LangCo
 
       <div className="border-b border-navy-900/10 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2.5">
+          <GovLogo
+            spec={GOV_LOGOS[0]}
+            className="hidden h-11 shrink-0 sm:block"
+          />
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <div className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-navy-900 text-white">
               <Chakra className="h-8 w-8" color="#ffffff" />
@@ -185,36 +190,72 @@ export function GovHeader({ lang, onLang }: { lang: LangCode; onLang: (l: LangCo
 }
 
 // ---------------------------------------------------------------- footer
-const PARTNERS = ["PM-AJAY", "MoSJE", "Digital India", "Skill India", "NSDC", "NSFDC", "SIDH"];
-
 export function GovFooter() {
+  const year = new Date().getFullYear();
   return (
-    <footer className="mt-16 border-t border-slate-200 bg-white">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <p className="mb-4 text-center text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-          Aligned with national missions
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
-          {PARTNERS.map((p, i) => (
-            <div
-              key={p}
-              className="flex items-center gap-2 grayscale transition hover:grayscale-0"
-            >
-              <div className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-400">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor">
-                  {i % 3 === 0 ? <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/> : 
-                   i % 3 === 1 ? <circle cx="12" cy="12" r="9" /> :
-                   <rect x="4" y="4" width="16" height="16" rx="2" />}
-                </svg>
+    <footer className="mt-16 border-t-4 border-saffron-500 bg-white">
+      {/* logo strip */}
+      <div className="border-b border-slate-200 bg-paper">
+        <div className="mx-auto max-w-6xl px-4 py-7">
+          <p className="mb-5 text-center text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            An initiative under PM-AJAY · Ministry of Social Justice &amp; Empowerment
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-5 md:gap-x-12">
+            {GOV_LOGOS.map((spec) => (
+              <div key={spec.label} className="flex flex-col items-center gap-1.5">
+                <GovLogo spec={spec} className="h-11 md:h-12" />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{spec.label}</span>
               </div>
-              <span className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{p}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-        <div className="tricolor-fade mx-auto mt-6 h-[3px] w-40 rounded-full opacity-70" />
-        <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-400">
-          JeevikaSetu — Working prototype for Smart India Hackathon 2026 · Problem Statement 26097 ·
-          Ministry of Social Justice &amp; Empowerment. Demonstration build with curated sample data.
+      </div>
+
+      {/* link columns */}
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-8 text-sm md:grid-cols-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Chakra className="h-7 w-7" color="#003366" />
+            <div>
+              <p className="text-sm font-extrabold text-navy-900">JeevikaSetu</p>
+              <p className="text-[11px] font-semibold text-slate-500">जीविकासेतु</p>
+            </div>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            AI voice assistant mapping informal skills of SC communities to NSQF-aligned
+            skilling pathways.
+          </p>
+        </div>
+        {[
+          ["Channels", [["Web voice agent", "/talk"], ["Feature phone (IVR)", "/ivr"], ["WhatsApp", "/whatsapp"]]],
+          ["For officials", [["Dashboard", "/admin"], ["Scheme: PM-AJAY GIA", "/"], ["NSQF pathways", "/"]]],
+          ["About", [["SIH 2026 · PS 26097", "/"], ["Accessibility", "/"], ["Help & support", "/"]]],
+        ].map(([title, links]) => (
+          <div key={String(title)}>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-navy-900">{String(title)}</p>
+            <ul className="space-y-1.5">
+              {(links as [string, string][]).map(([label, href]) => (
+                <li key={label}>
+                  <Link href={href} className="text-[12px] font-medium text-slate-600 transition hover:text-saffron-600">
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {/* tricolor rule + copyright */}
+      <div className="tricolor h-[3px]" />
+      <div className="bg-navy-900 px-4 py-4 text-center text-[11px] leading-relaxed text-white/70">
+        <p>
+          © {year} JeevikaSetu · Working prototype for Smart India Hackathon 2026 ·
+          Problem Statement 26097 · Ministry of Social Justice &amp; Empowerment.
+        </p>
+        <p className="mt-1 text-white/45">
+          Demonstration build with curated sample data. Logos shown are placeholders pending
+          official artwork and are not an endorsement.
         </p>
       </div>
     </footer>

@@ -13,6 +13,8 @@ import { t } from "@/data/i18n";
 import { Ring } from "@/components/charts";
 import TrainingCenterMap from "@/components/TrainingCenterMap";
 import { formatINR } from "@/data/skills";
+import { recommend } from "@/lib/match";
+import { readLocalProfile } from "@/lib/offline-agent";
 
 interface Bundle {
   beneficiary: { id: string; name: string; profile: BeneficiaryProfile };
@@ -36,19 +38,34 @@ export default function RecoClient({ id }: { id: string }) {
 
   useEffect(() => {
     (async () => {
+      // offline/mock path — everything is computed in the browser
+      const local = readLocalProfile(id) as Bundle | null;
       try {
-        const res = await fetch(`/api/beneficiaries/${id}`);
-        const j = (await res.json()) as Bundle & { error?: string };
-        if (j.error) throw new Error(j.error);
+        let j: Bundle;
+        if (local && id.startsWith("local-")) {
+          j = local;
+        } else {
+          const res = await fetch(`/api/beneficiaries/${id}`);
+          const parsed = (await res.json()) as Bundle & { error?: string };
+          if (parsed.error) throw new Error(parsed.error);
+          j = parsed;
+        }
         let list = j.recommendations;
         if (!list) {
-          const rec = await fetch("/api/recommend", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ beneficiaryId: id }),
-          });
-          const rj = (await rec.json()) as { results: RecommendationResult[] };
-          list = rj.results;
+          try {
+            if (id.startsWith("local-")) throw new Error("local");
+            const rec = await fetch("/api/recommend", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ beneficiaryId: id }),
+            });
+            if (!rec.ok) throw new Error(`HTTP ${rec.status}`);
+            const rj = (await rec.json()) as { results: RecommendationResult[] };
+            list = rj.results;
+          } catch {
+            // deterministic matching engine runs fine client-side
+            list = recommend(j.beneficiary.profile);
+          }
         }
         setBundle(j);
         setResults(list);

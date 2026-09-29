@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 96" width="300" height="96" role="img" aria-label="NSDC">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="#1a4d8f"/><stop offset="100%" stop-color="#2f4596"/>
+  </linearGradient></defs>
+  <rect x="2" y="2" width="296" height="92" rx="14" fill="#ffffff" stroke="#e3e0d6" stroke-width="2"/>
+  <circle cx="48" cy="48" r="26" fill="url(#g)"/>
+  <circle cx="48" cy="48" r="17" fill="none" stroke="#ffffff" stroke-width="2.5" opacity="0.85"/>
+  <circle cx="48" cy="48" r="4" fill="#ffffff"/>
+  <text x="88" y="42" font-family="Noto Sans, Segoe UI, sans-serif" font-size="20" font-weight="800" fill="#003366" textLength="50" lengthAdjust="spacingAndGlyphs">NSDC</text>
+  <text x="88" y="61" font-family="Noto Sans, Segoe UI, sans-serif" font-size="10.5" font-weight="600" fill="#64748b" textLength="167" lengthAdjust="spacingAndGlyphs">Skill Development Corporation</text>
+  <rect x="88" y="70" width="55" height="4" rx="2" fill="#FF9933"/>
+  <rect x="146" y="70" width="28" height="4" rx="2" fill="#138808"/>
+</svg>

@@ -1,12 +1,42 @@
-// Client-side speech utilities (Module 2 front half):
-//  - browser SpeechRecognition (live STT fallback when no OpenAI key)
-//  - speak(): tries server OpenAI TTS first, falls back to speechSynthesis
+// ─────────────────────────────────────────────────────────────────────────────
+// Client-side speech utilities — BROWSER-NATIVE FIRST (zero API cost).
+//
+//  STT : window.SpeechRecognition / window.webkitSpeechRecognition
+//  TTS : window.speechSynthesis
+//
+// Server (OpenAI Whisper / TTS) is only ever attempted when the app explicitly
+// reports it is live AND the browser-native path has not been forced. Any
+// server failure (429 insufficient_quota, 500, network) trips a permanent
+// per-session circuit breaker so we never hang on a dead endpoint again.
+// ─────────────────────────────────────────────────────────────────────────────
 "use client";
 
 import type { LangCode } from "@/lib/types";
 import { LANGS } from "@/data/i18n";
 
 export const bcpOf = (lang: LangCode): string => LANGS.find((l) => l.code === lang)?.bcp ?? "hi-IN";
+
+// ───────────────────────────────────────────────────── native-only switchboard
+/**
+ * Default TRUE: the demo runs entirely on free browser APIs.
+ * `setBrowserNativeOnly(false)` is only called when /api/config reports a live,
+ * quota-healthy OpenAI key. Any server failure flips it back to true forever.
+ */
+let browserNativeOnly = true;
+
+export function setBrowserNativeOnly(on: boolean): void {
+  browserNativeOnly = on;
+}
+export function isBrowserNativeOnly(): boolean {
+  return browserNativeOnly;
+}
+/** Permanently disable server speech for this session (quota / 5xx / offline). */
+export function tripSpeechBreaker(reason?: string): void {
+  if (!browserNativeOnly) {
+    console.warn(`[JeevikaSetu] Server speech disabled → browser-native mode. ${reason ?? ""}`);
+  }
+  browserNativeOnly = true;
+}
 
 interface SRIInstance {
   lang: string;
@@ -44,14 +74,17 @@ export function listen(
     onFinal?: (text: string) => void;
     onEnd?: () => void;
     onError?: (err: string) => void;
+    /** keep the recognizer open across pauses (hands-free / IVR mode) */
+    continuous?: boolean;
   },
 ): ListenHandle | null {
   const Ctor = srCtor();
   if (!Ctor) return null;
   const rec = new Ctor();
+  // Locale drives recognition accuracy: hi-IN, en-IN, ta-IN, te-IN, mr-IN, bn-IN
   rec.lang = bcpOf(lang);
   rec.interimResults = true;
-  rec.continuous = false;
+  rec.continuous = Boolean(opts.continuous);
   rec.maxAlternatives = 1;
   let finalText = "";
   rec.onresult = (e: SRIEvent) => {
@@ -90,53 +123,95 @@ export function stopSpeaking(): void {
   }
 }
 
-/** Speak text. Server TTS (OpenAI) first → browser speechSynthesis fallback. */
+/**
+ * Speak `text`.
+ *   • Browser-native mode (default / after any failure): window.speechSynthesis
+ *   • Otherwise: one attempt at server OpenAI TTS, then permanent fallback.
+ * Never throws and never hangs — always resolves.
+ */
 export async function speak(text: string, lang: LangCode, onStart?: () => void): Promise<void> {
   stopSpeaking();
-  // ---- 1) server OpenAI TTS
-  try {
-    const res = await fetch("/api/voice/synthesize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, lang }),
-    });
-    if (res.ok && res.headers.get("content-type")?.includes("audio")) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      currentAudio = audio;
-      await new Promise<void>((resolve) => {
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        onStart?.();
-        audio.play().catch(() => resolve());
+  if (!text?.trim()) return;
+
+  if (!browserNativeOnly) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch("/api/voice/synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, lang }),
+        signal: ctrl.signal,
       });
-      URL.revokeObjectURL(url);
-      return;
+      clearTimeout(timer);
+      if (res.ok && res.headers.get("content-type")?.includes("audio")) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        currentAudio = audio;
+        await new Promise<void>((resolve) => {
+          audio.onended = () => resolve();
+          audio.onerror = () => resolve();
+          onStart?.();
+          audio.play().catch(() => resolve());
+        });
+        URL.revokeObjectURL(url);
+        return;
+      }
+      tripSpeechBreaker(`TTS HTTP ${res.status}`);
+    } catch (e) {
+      tripSpeechBreaker(String(e));
     }
-  } catch {
-    /* fall through to browser TTS */
   }
-  // ---- 2) browser speechSynthesis (pick the most natural available voice)
+
+  await speakBrowser(text, lang, onStart);
+}
+
+/** Pure browser speechSynthesis playback — free, offline, zero latency. */
+export async function speakBrowser(text: string, lang: LangCode, onStart?: () => void): Promise<void> {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   const voices = await loadVoices();
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const done = () => { if (!settled) { settled = true; resolve(); } };
-    const u = new SpeechSynthesisUtterance(text);
-    const bcp = bcpOf(lang);
-    u.lang = bcp;
-    u.rate = 0.96;
-    u.pitch = 1.02;
-    const voice = pickVoice(voices, bcp);
-    if (voice) u.voice = voice;
-    u.onend = done;
-    u.onerror = done;
-    onStart?.();
-    window.speechSynthesis.speak(u);
-    // Safety net — some browsers drop onend on long utterances.
-    setTimeout(done, Math.max(6000, text.length * 95));
-  });
+  const bcp = bcpOf(lang);
+
+  // Chrome silently truncates long utterances — chunk on sentence boundaries.
+  const chunks = chunkText(text, 220);
+  for (const chunk of chunks) {
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const done = () => { if (!settled) { settled = true; resolve(); } };
+      const u = new SpeechSynthesisUtterance(chunk);
+      u.lang = bcp;
+      u.rate = 0.95;
+      u.pitch = 1.02;
+      u.volume = 1;
+      const voice = pickVoice(voices, bcp);
+      if (voice) u.voice = voice;
+      u.onend = done;
+      u.onerror = done;
+      onStart?.();
+      try {
+        window.speechSynthesis.resume(); // recover from a paused engine
+        window.speechSynthesis.speak(u);
+      } catch { done(); return; }
+      // Safety net — some browsers drop onend.
+      setTimeout(done, Math.max(4000, chunk.length * 95));
+    });
+  }
+}
+
+/** Split long text into speakable chunks without cutting mid-word. */
+function chunkText(text: string, max: number): string[] {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return [clean];
+  const parts = clean.split(/(?<=[।.!?॥;])\s+/);
+  const out: string[] = [];
+  let buf = "";
+  for (const p of parts) {
+    if ((buf + " " + p).trim().length > max && buf) { out.push(buf.trim()); buf = p; }
+    else buf = (buf + " " + p).trim();
+  }
+  if (buf) out.push(buf.trim());
+  return out.flatMap((c) => (c.length <= max ? [c] : (c.match(new RegExp(`.{1,${max}}(\\s|$)`, "g")) ?? [c])));
 }
 
 /** speechSynthesis voices load asynchronously on first use. */
@@ -212,3 +287,24 @@ export async function getMicStream(): Promise<MediaStream | null> {
     return null;
   }
 }
+
+// ───────────────────────────────────────────────────────────── audio unlock
+/**
+ * Browsers block speech synthesis until a user gesture. Call this from the
+ * first click/tap (e.g. the green "Call" button) so the very first AI sentence
+ * actually plays on the judges' laptop.
+ */
+export function warmUpSpeech(): void {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+    window.speechSynthesis.resume();
+    void window.speechSynthesis.getVoices();
+  } catch { /* noop */ }
+}
+
+/** True when window.speechSynthesis is available. */
+export const supportsBrowserTTS = (): boolean =>
+  typeof window !== "undefined" && "speechSynthesis" in window;

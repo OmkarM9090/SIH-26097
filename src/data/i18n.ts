@@ -268,7 +268,10 @@ type ExtraKey =
   | "hold_speak" | "tap_speak_btn" | "listening_now" | "replay" | "interview"
   | "voice_on" | "voice_off" | "mic_mode" | "ptt" | "continuous" | "profile_ready"
   | "mic_denied" | "stt_unsupported" | "no_speech" | "stt_failed" | "retry"
-  | "lang_switched" | "ai_live" | "ai_offline" | "connecting";
+  | "lang_switched" | "ai_live" | "ai_offline" | "connecting"
+  | "typing" | "offline_engine" | "release_to_send" | "you_said"
+  | "calling" | "call_connected" | "call_ended" | "end_call" | "speaker"
+  | "start_call" | "in_call" | "speak_now" | "ivr_hint" | "restart";
 
 export const EXTRA: Record<ExtraKey, Record<LangCode, string>> = {
   interview: { hi: "साक्षात्कार", en: "Interview", ta: "நேர்காணல்", te: "ఇంటర్వ్యూ", mr: "मुलाखत", bn: "সাক্ষাৎকার" },
@@ -291,6 +294,20 @@ export const EXTRA: Record<ExtraKey, Record<LangCode, string>> = {
   ai_live: { hi: "AI: GPT-4o लाइव", en: "AI: GPT-4o live", ta: "AI: GPT-4o நேரலை", te: "AI: GPT-4o లైవ్", mr: "AI: GPT-4o लाइव्ह", bn: "AI: GPT-4o লাইভ" },
   ai_offline: { hi: "AI: ऑन-डिवाइस इंजन", en: "AI: on-device engine", ta: "AI: சாதன இயந்திரம்", te: "AI: ఆన్-డివైస్ ఇంజిన్", mr: "AI: ऑन-डिव्हाइस इंजिन", bn: "AI: অন-ডিভাইস ইঞ্জিন" },
   connecting: { hi: "जुड़ रहे हैं…", en: "Connecting…", ta: "இணைக்கிறது…", te: "కనెక్ట్ అవుతోంది…", mr: "जोडत आहे…", bn: "সংযোগ হচ্ছে…" },
+  typing: { hi: "जीविकासेतु लिख रही है…", en: "JeevikaSetu is typing…", ta: "ஜீவிகாசேது தட்டச்சு செய்கிறது…", te: "జీవికాసేతు టైప్ చేస్తోంది…", mr: "जीविकासेतू टाइप करत आहे…", bn: "জীবিকাসেতু টাইপ করছে…" },
+  offline_engine: { hi: "ऑफ़लाइन इंजन चालू — बातचीत जारी है", en: "Offline engine active — interview continues", ta: "ஆஃப்லைன் இயந்திரம் செயலில்", te: "ఆఫ్‌లైన్ ఇంజిన్ యాక్టివ్", mr: "ऑफलाइन इंजिन सुरू", bn: "অফলাইন ইঞ্জিন চালু" },
+  release_to_send: { hi: "छोड़ें और भेजें", en: "Release to send", ta: "விடுவித்து அனுப்பு", te: "వదిలి పంపండి", mr: "सोडा आणि पाठवा", bn: "ছেড়ে দিন" },
+  you_said: { hi: "आपने कहा", en: "You said", ta: "நீங்கள் சொன்னது", te: "మీరు చెప్పింది", mr: "तुम्ही म्हणालात", bn: "আপনি বললেন" },
+  calling: { hi: "कॉल मिलाया जा रहा है…", en: "Calling…", ta: "அழைக்கிறது…", te: "కాల్ చేస్తోంది…", mr: "कॉल करत आहे…", bn: "কল হচ্ছে…" },
+  call_connected: { hi: "कॉल जुड़ गया", en: "Call connected", ta: "அழைப்பு இணைக்கப்பட்டது", te: "కాల్ కనెక్ట్ అయ్యింది", mr: "कॉल जोडला", bn: "কল সংযুক্ত" },
+  call_ended: { hi: "कॉल समाप्त", en: "Call ended", ta: "அழைப்பு முடிந்தது", te: "కాల్ ముగిసింది", mr: "कॉल संपला", bn: "কল শেষ" },
+  end_call: { hi: "कॉल काटें", en: "End call", ta: "அழைப்பை முடி", te: "కాల్ ముగించు", mr: "कॉल बंद करा", bn: "কল শেষ করুন" },
+  speaker: { hi: "स्पीकर", en: "Speaker", ta: "ஸ்பீக்கர்", te: "స్పీకర్", mr: "स्पीकर", bn: "স্পিকার" },
+  start_call: { hi: "कॉल करें", en: "Call", ta: "அழை", te: "కాల్", mr: "कॉल करा", bn: "কল করুন" },
+  in_call: { hi: "कॉल चालू", en: "In call", ta: "அழைப்பில்", te: "కాల్‌లో", mr: "कॉलमध्ये", bn: "কলে" },
+  speak_now: { hi: "अब बोलिए", en: "Speak now", ta: "இப்போது பேசுங்கள்", te: "ఇప్పుడు మాట్లాడండి", mr: "आता बोला", bn: "এখন বলুন" },
+  ivr_hint: { hi: "फ़ोन पर बोलिए — जवाब आवाज़ में मिलेगा", en: "Just speak — you will hear the reply", ta: "பேசுங்கள் — பதில் குரலில் வரும்", te: "మాట్లాడండి — సమాధానం వినిపిస్తుంది", mr: "बोला — उत्तर आवाजात मिळेल", bn: "বলুন — উত্তর শুনতে পাবেন" },
+  restart: { hi: "फिर से शुरू करें", en: "Start again", ta: "மீண்டும் தொடங்கு", te: "మళ్లీ ప్రారంభించు", mr: "पुन्हा सुरू करा", bn: "আবার শুরু করুন" },
 };
 
 export function tx(key: ExtraKey, lang: LangCode): string {
