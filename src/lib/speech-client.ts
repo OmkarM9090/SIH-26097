@@ -117,25 +117,57 @@ export async function speak(text: string, lang: LangCode, onStart?: () => void):
   } catch {
     /* fall through to browser TTS */
   }
-  // ---- 2) browser speechSynthesis
+  // ---- 2) browser speechSynthesis (pick the most natural available voice)
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const voices = await loadVoices();
   await new Promise<void>((resolve) => {
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; resolve(); } };
     const u = new SpeechSynthesisUtterance(text);
     const bcp = bcpOf(lang);
     u.lang = bcp;
-    u.rate = 0.95;
-    const voices = window.speechSynthesis.getVoices();
-    const voice =
-      voices.find((v) => v.lang.toLowerCase().startsWith(bcp.slice(0, 2).toLowerCase())) ??
-      voices.find((v) => v.lang.toLowerCase().includes("in"));
+    u.rate = 0.96;
+    u.pitch = 1.02;
+    const voice = pickVoice(voices, bcp);
     if (voice) u.voice = voice;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
+    u.onend = done;
+    u.onerror = done;
     onStart?.();
     window.speechSynthesis.speak(u);
-    // Safety timeout — some browsers drop onend
-    setTimeout(resolve, Math.max(4000, text.length * 120));
+    // Safety net — some browsers drop onend on long utterances.
+    setTimeout(done, Math.max(6000, text.length * 95));
   });
+}
+
+/** speechSynthesis voices load asynchronously on first use. */
+function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise((resolve) => {
+    const existing = window.speechSynthesis.getVoices();
+    if (existing.length) { resolve(existing); return; }
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve(window.speechSynthesis.getVoices());
+    };
+    window.speechSynthesis.onvoiceschanged = finish;
+    setTimeout(finish, 1200);
+  });
+}
+
+/** Prefer an exact-locale, natural/neural voice; degrade gracefully. */
+function pickVoice(voices: SpeechSynthesisVoice[], bcp: string): SpeechSynthesisVoice | undefined {
+  const base = bcp.slice(0, 2).toLowerCase();
+  const natural = (v: SpeechSynthesisVoice) =>
+    /google|natural|neural|premium|enhanced|online/i.test(v.name);
+  const exact = voices.filter((v) => v.lang.toLowerCase().replace("_", "-") === bcp.toLowerCase());
+  const sameLang = voices.filter((v) => v.lang.toLowerCase().startsWith(base));
+  const indian = voices.filter((v) => /(-|_)IN\b/i.test(v.lang));
+  return (
+    exact.find(natural) ?? exact[0] ??
+    sameLang.find(natural) ?? sameLang[0] ??
+    indian.find(natural) ?? indian[0]
+  );
 }
 
 // ---------------------------------------------------------------- recording

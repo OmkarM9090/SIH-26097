@@ -165,17 +165,34 @@ export function fallbackStep(slots: SlotState, stage: Stage, userText: string, l
   return { reply, slots: updated, stage: next, done: false };
 }
 
+const OWN_WORK: Record<LangCode, string> = {
+  hi: "खुद का काम", en: "own work", ta: "சொந்தத் தொழில்", te: "స్వంత పని", mr: "स्वतःचे काम", bn: "নিজের কাজ",
+};
+const A_JOB: Record<LangCode, string> = {
+  hi: "नौकरी", en: "a job", ta: "வேலை", te: "ఉద్యోగం", mr: "नोकरी", bn: "চাকরি",
+};
+const EITHER: Record<LangCode, string> = {
+  hi: "दोनों", en: "either", ta: "இரண்டும்", te: "రెండూ", mr: "दोन्ही", bn: "উভয়",
+};
+const YOU_SAID: Record<LangCode, (v: string) => string> = {
+  hi: (v) => `आपने बताया: ${v}.`,
+  en: (v) => `You said: ${v}.`,
+  ta: (v) => `நீங்கள் சொன்னது: ${v}.`,
+  te: (v) => `మీరు చెప్పింది: ${v}.`,
+  mr: (v) => `तुम्ही सांगितले: ${v}.`,
+  bn: (v) => `আপনি বললেন: ${v}.`,
+};
+
 function shortEcho(stage: Stage, s: SlotState, lang: LangCode): string {
   const v =
     stage === "name" ? s.name :
     stage === "location" ? (s.district ? `${s.village ? s.village + ", " : ""}${s.district}, ${s.state}` : s.place) :
     stage === "education" ? s.education :
-    stage === "employment" ? (s.preference === "self" ? (lang === "hi" ? "खुद का काम" : "own work") : s.preference === "wage" ? (lang === "hi" ? "नौकरी" : "a job") : (lang === "hi" ? "दोनों" : "either")) :
+    stage === "employment" ? (s.preference === "self" ? OWN_WORK[lang] : s.preference === "wage" ? A_JOB[lang] : EITHER[lang]) :
     stage === "mobility" ? (s.mobilityKm ? `${s.mobilityKm} km` : undefined) :
     undefined;
   if (!v) return "";
-  if (lang === "hi") return `आपने बताया: ${v}.`;
-  return `You said: ${v}.`;
+  return (YOU_SAID[lang] ?? YOU_SAID.en)(v);
 }
 
 /** Natural-language recap of everything the agent understood. */
@@ -185,18 +202,22 @@ export function buildSummary(s: SlotState, lang: LangCode): string {
     .map((id) => SKILL_MAP.get(id)?.[lang === "hi" ? "hi" : "en"] ?? id)
     .join(", ") || "—";
   const interests = (s.interestLabels ?? []).join(", ") || "—";
-  const pref =
-    s.preference === "self" ? { hi: "खुद का काम", en: "own work / business" } :
-    s.preference === "wage" ? { hi: "नौकरी", en: "a job" } : { hi: "दोनों ठीक हैं", en: "either" };
+  const pref = s.preference === "self" ? OWN_WORK[lang] : s.preference === "wage" ? A_JOB[lang] : EITHER[lang];
+  const name = s.name ?? "—";
+  const edu = s.education ?? "—";
+  const fam = s.familyOccupation ?? "—";
+  const cur = s.currentLivelihood ?? "—";
+  const km = s.mobilityKm ?? 25;
 
-  if (lang === "hi") {
-    return `मैंने यह समझा — आपका नाम ${s.name ?? "—"} है, आप ${loc} से हैं, शिक्षा ${s.education ?? "—"}। ` +
-      `परिवार का काम: ${s.familyOccupation ?? "—"}; अभी का काम: ${s.currentLivelihood ?? "—"}। ` +
-      `आपके हुनर: ${skills}। आपकी रुचि: ${interests}। आप ${pref.hi} चाहते हैं और ट्रेनिंग के लिए करीब ${s.mobilityKm ?? 25} किलोमीटर तक जा सकते हैं। शारीरिक दिक्कत: ${s.constraints ?? "कोई नहीं"}।`;
-  }
-  return `Here is what I understood — your name is ${s.name ?? "—"}, you live in ${loc}, education: ${s.education ?? "—"}. ` +
-    `Family occupation: ${s.familyOccupation ?? "—"}; current work: ${s.currentLivelihood ?? "—"}. ` +
-    `Your skills: ${skills}. Interests: ${interests}. You prefer ${pref.en}, and can travel about ${s.mobilityKm ?? 25} km for training. Physical constraints: ${s.constraints ?? "none"}.`;
+  const templates: Record<LangCode, string> = {
+    hi: `मैंने यह समझा — आपका नाम ${name} है, आप ${loc} से हैं, शिक्षा ${edu}। परिवार का काम: ${fam}; अभी का काम: ${cur}। आपके हुनर: ${skills}। आपकी रुचि: ${interests}। आप ${pref} चाहते हैं और ट्रेनिंग के लिए करीब ${km} किलोमीटर तक जा सकते हैं। शारीरिक दिक्कत: ${s.constraints ?? "कोई नहीं"}।`,
+    en: `Here is what I understood — your name is ${name}, you live in ${loc}, education: ${edu}. Family occupation: ${fam}; current work: ${cur}. Your skills: ${skills}. Interests: ${interests}. You prefer ${pref}, and can travel about ${km} km for training. Physical constraints: ${s.constraints ?? "none"}.`,
+    ta: `நான் புரிந்துகொண்டது — உங்கள் பெயர் ${name}, நீங்கள் ${loc} இல் வசிக்கிறீர்கள், கல்வி: ${edu}. குடும்பத் தொழில்: ${fam}; தற்போதைய வேலை: ${cur}. உங்கள் திறன்கள்: ${skills}. ஆர்வம்: ${interests}. நீங்கள் ${pref} விரும்புகிறீர்கள், பயிற்சிக்கு சுமார் ${km} கி.மீ. பயணிக்க முடியும். உடல் சார்ந்த சிரமம்: ${s.constraints ?? "இல்லை"}.`,
+    te: `నేను అర్థం చేసుకున్నది — మీ పేరు ${name}, మీరు ${loc} లో ఉంటారు, విద్య: ${edu}. కుటుంబ వృత్తి: ${fam}; ప్రస్తుత పని: ${cur}. మీ నైపుణ్యాలు: ${skills}. ఆసక్తులు: ${interests}. మీరు ${pref} ఇష్టపడుతున్నారు, శిక్షణ కోసం సుమారు ${km} కి.మీ. ప్రయాణించగలరు. శారీరక ఇబ్బందులు: ${s.constraints ?? "లేవు"}.`,
+    mr: `मला हे समजले — तुमचे नाव ${name}, तुम्ही ${loc} येथे राहता, शिक्षण: ${edu}. कौटुंबिक काम: ${fam}; सध्याचे काम: ${cur}. तुमची कौशल्ये: ${skills}. आवड: ${interests}. तुम्हाला ${pref} हवे आहे आणि प्रशिक्षणासाठी सुमारे ${km} किलोमीटर प्रवास करू शकता. शारीरिक अडचण: ${s.constraints ?? "नाही"}.`,
+    bn: `আমি যা বুঝলাম — আপনার নাম ${name}, আপনি ${loc}-এ থাকেন, শিক্ষা: ${edu}। পারিবারিক কাজ: ${fam}; বর্তমান কাজ: ${cur}। আপনার দক্ষতা: ${skills}। আগ্রহ: ${interests}। আপনি ${pref} চান এবং প্রশিক্ষণের জন্য প্রায় ${km} কিলোমিটার যেতে পারেন। শারীরিক সমস্যা: ${s.constraints ?? "নেই"}।`,
+  };
+  return templates[lang] ?? templates.en;
 }
 
 /** Convert conversation slots into the formal BeneficiaryProfile (Module 3). */

@@ -7,10 +7,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Channel, ChatTurn, ConversationReply, LangCode, Stage } from "@/lib/types";
-import { STAGE_LABELS } from "@/lib/conversation";
+import { QUESTIONS } from "@/data/i18n";
 import { RAMESH_PERSONA } from "@/data/personas";
 import { STAGES } from "@/lib/conversation";
-import { t, LANGS, LANG_NAME } from "@/data/i18n";
+import { t, tx, stageLabel, LANGS, LANG_NAME } from "@/data/i18n";
 import {
   getMicStream, listen, record, speak, stopSpeaking, supportsBrowserSTT,
   type ListenHandle, type RecorderHandle,
@@ -29,13 +29,13 @@ export default function TalkClient({
   demo: boolean;
 }) {
   const router = useRouter();
-  const [appLang] = useAppLang();
+  const [appLang, setAppLang] = useAppLang();
   const [lang, setLang] = useState<LangCode>(langOverride ?? appLang);
 
-  // honour global language selector when the deep-link didn't pin a language
-  useEffect(() => {
-    if (!langOverride) setLang(appLang);
-  }, [appLang, langOverride]);
+  const langRef = useRef<LangCode>(langOverride ?? appLang);
+  langRef.current = lang;
+
+
   const [status, setStatus] = useState<Status>("boot");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [stage, setStage] = useState<Stage>("name");
@@ -120,6 +120,52 @@ export default function TalkClient({
     [],
   );
 
+  /**
+   * Switch the interview language at any point.
+   * Everything follows: UI strings, the assistant's current question (re-spoken
+   * in the new language), speech-recognition locale and TTS voice, plus the
+   * app-wide selector in the header.
+   */
+  const applyLang = useCallback(
+    (next: LangCode, propagate = true) => {
+      if (next === langRef.current) return;
+      langRef.current = next;
+      setLang(next);
+      if (propagate) setAppLang(next);
+      // stop anything in flight so the old-language audio never overlaps
+      stopSpeaking();
+      listenRef.current?.abort();
+      listenRef.current = null;
+      recRef.current?.cancel();
+      recRef.current = null;
+      streamRef.current?.getTracks().forEach((tr) => tr.stop());
+      streamRef.current = null;
+      setInterim("");
+      setErrorMsg("");
+      setStatus((s) => (s === "listening" || s === "speaking" ? "idle" : s));
+
+      // Re-ask the pending question in the new language so the beneficiary is
+      // never stranded with a sentence they cannot read or hear.
+      setTurns((prev) => {
+        const idx = [...prev].reverse().findIndex((x) => x.role === "assistant");
+        if (idx === -1) return prev;
+        const at = prev.length - 1 - idx;
+        const q = stage !== "done" ? QUESTIONS[stage as Exclude<Stage, "done">]?.[next] : undefined;
+        if (!q) return prev;
+        const copy = [...prev];
+        copy[at] = { ...copy[at], text: q, lang: next };
+        void speakAI(q, next);
+        return copy;
+      });
+    },
+    [setAppLang, speakAI, stage],
+  );
+
+  // honour the global header language selector when the deep-link didn't pin one
+  useEffect(() => {
+    if (!langOverride) applyLang(appLang, false);
+  }, [appLang, langOverride, applyLang]);
+
   const finalizeProfile = useCallback(async () => {
     if (!sessionRef.current) return;
     setStatus("processing");
@@ -153,12 +199,12 @@ export default function TalkClient({
         const res = await fetch("/api/conversation/message", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId: sessionRef.current, channel, lang, userText }),
+          body: JSON.stringify({ sessionId: sessionRef.current, channel, lang: langRef.current, userText }),
         });
         const data = (await res.json()) as ConversationReply & { error?: string };
         if (data.error) throw new Error(data.error);
         setStage(data.stage);
-        if (data.language !== lang) setLang(data.language);
+        if (data.language !== langRef.current) { langRef.current = data.language; setLang(data.language); }
         setAiPowered(data.aiPowered);
         setTurns((p) => [...p, { role: "assistant", text: data.reply, lang: data.language, at: Date.now() }]);
         scrollBottom();
@@ -179,6 +225,9 @@ export default function TalkClient({
     },
     [channel, lang, speakAI, finalizeProfile],
   );
+
+  const sendTurnRef = useRef<typeof sendTurn | null>(null);
+  sendTurnRef.current = sendTurn;
 
   // ---------------------------------------------------------------- boot
   useEffect(() => {
@@ -240,16 +289,77 @@ export default function TalkClient({
   };
 
   // ------------------------------------------------------------- mic control
-  const startListening = async () => {
+  // Two interchangeable paths, chosen automatically:
+  //   • Whisper mode  — MediaRecorder clip → /api/voice/transcribe (needs a key)
+  //   • Web Speech    — live browser SpeechRecognition in the selected language
+  // If Whisper is not configured (the common demo case) we never record a clip
+  // that can't be transcribed; we go straight to the browser recognizer, which
+  // is why the mic previously appeared to "not take any input".
+  const startWebSpeech = useCallback(async (): Promise<boolean> => {
+    if (!supportsBrowserSTT()) return false;
+    const handle = listen(langRef.current, {
+      onInterim: (txt) => setInterim(txt),
+      onFinal: async (txt) => {
+        listenRef.current = null;
+        stopViz();
+        streamRef.current?.getTracks().forEach((tr) => tr.stop());
+        streamRef.current = null;
+        setInterim("");
+        if (!txt.trim()) { setStatus("idle"); return; }
+        const res = await sendTurnRef.current?.(txt);
+        if (micModeRef.current === "continuous" && res && !res.done) {
+          void startListeningRef.current?.();
+        }
+      },
+      onEnd: () => {
+        if (listenRef.current) {
+          // ended without a final result (silence)
+          listenRef.current = null;
+          stopViz();
+          streamRef.current?.getTracks().forEach((tr) => tr.stop());
+          streamRef.current = null;
+          setStatus((st) => (st === "listening" ? "idle" : st));
+        }
+      },
+      onError: (err) => {
+        listenRef.current = null;
+        stopViz();
+        if (err === "not-allowed" || err === "service-not-allowed") {
+          setErrorMsg(tx("mic_denied", langRef.current));
+        } else if (err === "no-speech" || err === "aborted") {
+          setErrorMsg(err === "no-speech" ? tx("no_speech", langRef.current) : "");
+        } else {
+          setErrorMsg(tx("stt_failed", langRef.current));
+        }
+        setStatus("idle");
+      },
+    });
+    if (!handle) return false;
+    listenRef.current = handle;
+    setStatus("listening");
+    void attachStreamViz();
+    return true;
+  }, [stopViz]);
+
+  const startListening = useCallback(async () => {
     setErrorMsg("");
-    // Always record a real WebM/Opus clip first. Browser SpeechRecognition is
-    // not reliable on Firefox/Safari and, previously, silently bypassed the
-    // MediaRecorder/Whisper path. This makes the microphone behaviour the same
-    // in every supported browser.
+    setInterim("");
+    stopSpeaking();
+
+    if (sttMode !== "whisper") {
+      const ok = await startWebSpeech();
+      if (ok) return;
+      setErrorMsg(tx("stt_unsupported", langRef.current));
+      setStatus("idle");
+      return;
+    }
+
+    // Whisper path — capture a real audio clip.
     const stream = await getMicStream();
     if (!stream) {
-      setErrorMsg("Microphone permission was denied. Allow microphone access and try again.");
-      setStatus("error");
+      if (await startWebSpeech()) return;
+      setErrorMsg(tx("mic_denied", langRef.current));
+      setStatus("idle");
       return;
     }
     streamRef.current = stream;
@@ -258,15 +368,20 @@ export default function TalkClient({
     } catch {
       stream.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
-      setErrorMsg("This browser cannot record audio. Please type your answer instead.");
-      setStatus("error");
+      if (await startWebSpeech()) return;
+      setErrorMsg(tx("stt_unsupported", langRef.current));
+      setStatus("idle");
       return;
     }
     setStatus("listening");
     void attachStreamViz();
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sttMode, startWebSpeech]);
 
-  const attachStreamViz = async () => {
+  const startListeningRef = useRef<typeof startListening | null>(null);
+  startListeningRef.current = startListening;
+
+  async function attachStreamViz() {
     try {
       const stream = streamRef.current ?? (await getMicStream());
       if (!stream) { drawIdle(); return; }
@@ -279,72 +394,76 @@ export default function TalkClient({
       src.connect(analyser);
       drawLive(analyser);
     } catch { drawIdle(); }
-  };
+  }
 
   const stopListening = async () => {
-    if (listenRef.current) { listenRef.current.stop(); listenRef.current = null; }
-    if (recRef.current) {
+    // Web Speech path: just stop, the onFinal handler sends the turn.
+    if (listenRef.current) {
+      const h = listenRef.current;
+      listenRef.current = null;
       setStatus("processing");
-      const blob = await recRef.current.stop();
-      recRef.current = null;
-      streamRef.current?.getTracks().forEach((tr) => tr.stop());
-      streamRef.current = null;
-      stopViz();
-      if (!blob) { setStatus("idle"); return; }
-      try {
-        const fd = new FormData();
-        fd.append("audio", blob, "speech.webm");
-        fd.append("language", lang);
-        const res = await fetch("/api/voice/transcribe", { method: "POST", body: fd });
-        if (!res.ok) throw new Error("STT failed");
-        const data = (await res.json()) as { text?: string };
-        if (data.text) {
-          setInterim(data.text); // subtitle: show exactly what Whisper heard
-          await sendTurn(data.text);
-          if (micModeRef.current === "continuous" && status !== "done") {
-            // Continuous mode listens again after the assistant finishes speaking.
-            await startListening();
-          }
-        } else setStatus("idle");
-      } catch {
-        // A configured Whisper endpoint is the primary path. Keep the demo
-        // usable without an API key by falling back to the browser recognizer.
-        if (browserSTT) {
-          const handle = listen(lang, {
-            onInterim: (tx) => setInterim(tx),
-            onFinal: async (tx) => {
-              setInterim("");
-              await sendTurn(tx);
-              if (micModeRef.current === "continuous") await startListening();
-            },
-            onEnd: () => setStatus("idle"),
-            onError: () => { setErrorMsg("Could not transcribe — please type your answer"); setStatus("idle"); },
-          });
-          if (handle) { listenRef.current = handle; setStatus("listening"); return; }
+      h.stop();
+      // give the recognizer a moment to emit its final result
+      window.setTimeout(() => {
+        setStatus((st) => (st === "processing" && !recRef.current ? "idle" : st));
+      }, 2500);
+      return;
+    }
+    if (!recRef.current) { setStatus("idle"); return; }
+
+    setStatus("processing");
+    const blob = await recRef.current.stop();
+    recRef.current = null;
+    streamRef.current?.getTracks().forEach((tr) => tr.stop());
+    streamRef.current = null;
+    stopViz();
+    if (!blob || blob.size < 1200) {
+      setErrorMsg(tx("no_speech", langRef.current));
+      setStatus("idle");
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append("audio", blob, "speech.webm");
+      fd.append("language", langRef.current);
+      const res = await fetch("/api/voice/transcribe", { method: "POST", body: fd });
+      if (!res.ok) throw new Error("STT failed");
+      const data = (await res.json()) as { text?: string };
+      if (data.text?.trim()) {
+        setInterim(data.text);
+        const reply = await sendTurn(data.text);
+        if (micModeRef.current === "continuous" && reply && !reply.done) {
+          await startListening();
         }
-        setErrorMsg("Could not transcribe — please try again or type");
+      } else {
+        setErrorMsg(tx("no_speech", langRef.current));
         setStatus("idle");
       }
+    } catch {
+      // Whisper unreachable — fall back to the browser recognizer immediately.
+      if (await startWebSpeech()) return;
+      setErrorMsg(tx("stt_failed", langRef.current));
+      setStatus("idle");
     }
   };
 
   const micTap = async () => {
     if (status === "listening") await stopListening();
     else if (status === "speaking") { stopSpeaking(); setStatus("idle"); }
-    else if (status === "idle") await startListening();
+    else if (status === "idle" || status === "error") await startListening();
   };
 
   const lastAI = [...turns].reverse().find((x) => x.role === "assistant");
   const stageIdx = QUESTION_STAGES.indexOf(stage === "done" ? "done" : stage);
 
   const statusMeta: Record<Status, { text: string; cls: string }> = {
-    boot: { text: "…", cls: "bg-slate-200 text-slate-600" },
+    boot: { text: tx("connecting", lang), cls: "bg-slate-200 text-slate-600" },
     idle: { text: `${t("tap_speak", lang)}`, cls: "bg-navy-50 text-navy-800" },
     listening: { text: t("listening", lang), cls: "bg-greenIndia-100 text-greenIndia-600" },
     processing: { text: t("processing", lang), cls: "bg-saffron-100 text-saffron-600" },
     speaking: { text: t("speaking", lang), cls: "bg-blue-100 text-blue-800" },
     done: { text: "✓", cls: "bg-greenIndia-100 text-greenIndia-600" },
-    error: { text: "Retry", cls: "bg-red-100 text-red-700" },
+    error: { text: tx("retry", lang), cls: "bg-red-100 text-red-700" },
   };
 
   return (
@@ -360,7 +479,7 @@ export default function TalkClient({
         {/* --------------------------------------------- progress rail */}
         <aside className="gov-card order-2 flex flex-col p-5 lg:order-1">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-extrabold uppercase tracking-wider text-navy-900">Interview</h2>
+            <h2 className="text-sm font-extrabold uppercase tracking-wider text-navy-900">{tx("interview", lang)}</h2>
             <span className="rounded-full bg-navy-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
               {channel === "ivr" ? "IVR Call" : channel === "whatsapp" ? "WhatsApp" : "Voice"}
             </span>
@@ -374,7 +493,7 @@ export default function TalkClient({
                     {state === "done" ? "✓" : i + 1}
                   </span>
                   <span className={`font-semibold ${state === "active" ? "font-bold" : ""}`}>
-                    {lang === "hi" ? STAGE_LABELS[s].hi : STAGE_LABELS[s].en}
+                    {stageLabel(s, lang)}
                   </span>
                 </li>
               );
@@ -389,7 +508,7 @@ export default function TalkClient({
               {LANGS.map((l) => (
                 <button
                   key={l.code}
-                  onClick={() => setLang(l.code)}
+                  onClick={() => applyLang(l.code)}
                   className={`rounded-md px-2 py-1 text-[11px] font-bold transition ${l.code === lang ? "bg-navy-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
                 >
                   {l.code.toUpperCase()}
@@ -397,15 +516,15 @@ export default function TalkClient({
               ))}
             </div>
             <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-              <span>{aiPowered ? "AI: GPT-4o live" : "AI: on-device engine"}</span>
+              <span>{aiPowered ? tx("ai_live", lang) : tx("ai_offline", lang)}</span>
               <button onClick={() => setMuted((m) => !m)} className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-600">
-                {muted ? "Voice: off" : "Voice: on"}
+                {muted ? tx("voice_off", lang) : tx("voice_on", lang)}
               </button>
             </div>
             <div className="flex items-center justify-between pt-2 text-[11px] text-slate-400">
-              <span>Mic Mode:</span>
+              <span>{tx("mic_mode", lang)}:</span>
               <button onClick={() => setMicMode((m) => { const next = m === "ptt" ? "continuous" : "ptt"; micModeRef.current = next; return next; })} className="rounded bg-slate-100 px-2 py-0.5 font-bold text-slate-600">
-                {micMode === "ptt" ? "Push to Talk" : "Continuous"}
+                {micMode === "ptt" ? tx("ptt", lang) : tx("continuous", lang)}
               </button>
             </div>
           </div>
@@ -431,7 +550,7 @@ export default function TalkClient({
               <p className="truncate text-sm font-bold">JeevikaSetu <span className="font-medium text-white/60">• ਜी PM-AJAY साथी</span></p>
               <p className="text-[11px] text-white/60">{t("tagline", lang)}</p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${statusMeta[status].cls}`}>{status === "done" ? "Profile ready ✓" : statusMeta[status].text}</span>
+            <span className={`rounded-full px-3 py-1 text-[11px] font-bold ${statusMeta[status].cls}`}>{status === "done" ? `${tx("profile_ready", lang)} ✓` : statusMeta[status].text}</span>
           </div>
 
           {/* transcript */}
@@ -462,7 +581,7 @@ export default function TalkClient({
                 <div className="gov-card flex flex-col items-center gap-3 border-greenIndia-500/30 bg-greenIndia-50 px-6 py-5 text-center">
                   <span className="grid h-12 w-12 place-items-center rounded-full bg-greenIndia-500 text-2xl text-white">✓</span>
                   <p className="text-sm font-bold text-greenIndia-600">
-                    {lang === "hi" ? "आपकी प्रोफ़ाइल तैयार है!" : "Your profile is ready!"}
+                    {tx("profile_ready", lang)}
                   </p>
                   <button
                     onClick={() => router.push(`/profile/${beneficiaryId}${demo ? "?demo=1" : ""}`)}
@@ -496,7 +615,7 @@ export default function TalkClient({
               {lastAI && status === "idle" && (
                 <button
                   onClick={() => void speakAI(lastAI.text, (lastAI.lang as LangCode | undefined) ?? lang)}
-                  title="Replay" className="grid h-[46px] w-[46px] place-items-center rounded-xl border border-slate-200 text-navy-900 transition hover:bg-navy-50"
+                  title={tx("replay", lang)} className="grid h-[46px] w-[46px] place-items-center rounded-xl border border-slate-200 text-navy-900 transition hover:bg-navy-50"
                 >
                   <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                 </button>
@@ -515,16 +634,18 @@ export default function TalkClient({
                 style={{ WebkitUserSelect: "none", userSelect: "none" }}
               >
                 {status === "listening" ? (
-                  <><span className="text-xl">🎤</span> <span className="font-bold">Listening...</span></>
+                  <><span className="text-xl">🎤</span> <span className="font-bold">{tx("listening_now", lang)}</span></>
                 ) : (
-                  <><span className="text-xl">🎤</span> <span className="font-bold">{micMode === "ptt" ? "Hold to Speak" : "Tap to Speak"}</span></>
+                  <><span className="text-xl">🎤</span> <span className="font-bold">{micMode === "ptt" ? tx("hold_speak", lang) : tx("tap_speak_btn", lang)}</span></>
                 )}
               </button>
             </div>
             <p className="mt-2 text-center text-[11px] font-medium text-slate-400">
               {sttMode === "webspeech"
-                ? browserSTT ? "Live browser speech recognition active — use the button above to speak naturally" : "Mic STT not supported in this browser — type instead"
-                : "Whisper AI transcription mode active"}
+                ? browserSTT
+                  ? `${LANG_NAME[lang]} • ${t("tap_speak", lang)}`
+                  : tx("stt_unsupported", lang)
+                : `Whisper AI • ${LANG_NAME[lang]}`}
             </p>
           </div>
         </section>
