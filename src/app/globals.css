@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+@theme {
+  --color-navy-950: #050d26;
+  --color-navy-900: #0b1e46;
+  --color-navy-850: #102757;
+  --color-navy-800: #14295e;
+  --color-navy-700: #1a2a6b;
+  --color-navy-600: #22367f;
+  --color-navy-500: #2f4596;
+  --color-navy-100: #dfe5f5;
+  --color-navy-50: #eef1fa;
+
+  --color-saffron-600: #ea7d12;
+  --color-saffron-500: #ff9933;
+  --color-saffron-400: #ffad5c;
+  --color-saffron-100: #ffe8cf;
+  --color-saffron-50: #fff4e6;
+
+  --color-greenIndia-600: #0e6b06;
+  --color-greenIndia-500: #138808;
+  --color-greenIndia-100: #d9efdc;
+  --color-greenIndia-50: #eef8ee;
+
+  --color-paper: #f6f5f1;
+
+  --font-sans: "Noto Sans", "Noto Sans Devanagari", "Noto Sans Tamil",
+    "Noto Sans Telugu", "Noto Sans Bengali", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+}
+
+html {
+  font-family: var(--font-sans);
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-paper);
+  color: #17203a;
+}
+
+/* ------------------------------------------ accessibility modes */
+html[data-large="true"] { font-size: 118%; }
+html[data-contrast="true"] body {
+  background: #ffffff;
+  color: #000000;
+}
+html[data-contrast="true"] .gov-card,
+html[data-contrast="true"] .soft {
+  border: 2px solid #000 !important;
+  box-shadow: none !important;
+}
+
+/* ------------------------------------------ signature components */
+.tricolor {
+  background: linear-gradient(
+    90deg,
+    #ff9933 0% 33.4%,
+    #ffffff 33.4% 66.7%,
+    #138808 66.7% 100%
+  );
+}
+.tricolor-fade {
+  background: linear-gradient(90deg, #ff9933, #f4f4f4 45%, #138808);
+}
+
+.gov-card {
+  background: #ffffff;
+  border: 1px solid #e6e2d8;
+  border-radius: 1.1rem;
+  box-shadow: 0 1px 2px rgba(11, 30, 70, 0.05), 0 10px 30px -18px rgba(11, 30, 70, 0.25);
+}
+
+.hero-mesh {
+  background:
+    radial-gradient(60rem 30rem at 85% -10%, rgba(255, 153, 51, 0.16), transparent 60%),
+    radial-gradient(50rem 26rem at -10% 10%, rgba(19, 136, 8, 0.12), transparent 55%),
+    radial-gradient(40rem 22rem at 50% 120%, rgba(26, 42, 107, 0.18), transparent 60%),
+    linear-gradient(160deg, #0b1e46 0%, #14295e 55%, #1a2a6b 100%);
+}
+
+.grid-texture {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(60rem 34rem at 50% 20%, #000 40%, transparent 100%);
+}
+
+.chakra-spin { animation: chakra-rotate 60s linear infinite; }
+@keyframes chakra-rotate { to { transform: rotate(360deg); } }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rise { animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.rise-1 { animation-delay: 0.06s; }
+.rise-2 { animation-delay: 0.14s; }
+.rise-3 { animation-delay: 0.22s; }
+.rise-4 { animation-delay: 0.3s; }
+
+@keyframes ping-ring {
+  0% { transform: scale(1); opacity: 0.55; }
+  80%, 100% { transform: scale(1.9); opacity: 0; }
+}
+.ping-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 3px solid currentColor;
+  animation: ping-ring 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes speak-bounce {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.speak-bar { transform-origin: center; animation: speak-bounce 0.9s ease-in-out infinite; }
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, #eceadf 25%, #f7f5ee 50%, #eceadf 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes soft-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+.soft-float { animation: soft-float 5s ease-in-out infinite; }
+
+/* ------------------------------------------ chat bubbles */
+.bubble-ai {
+  background: #ffffff;
+  border: 1px solid #e6e2d8;
+  border-radius: 1rem 1rem 1rem 0.25rem;
+}
+.bubble-user {
+  background: #0b1e46;
+  color: #ffffff;
+  border-radius: 1rem 1rem 0.25rem 1rem;
+}
+.wa-bubble-ai {
+  background: #ffffff;
+  border-radius: 0.9rem 0.9rem 0.9rem 0.2rem;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+.wa-bubble-user {
+  background: #daf7c8;
+  border-radius: 0.9rem 0.9rem 0.2rem 0.9rem;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+
+/* ------------------------------------------ scrollbar */
+.nice-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.nice-scroll::-webkit-scrollbar-thumb { background: #c9c4b4; border-radius: 3px; }
+
+/* ------------------------------------------ print (report) */
+@media print {
+  body { background: #ffffff !important; }
+  .no-print { display: none !important; }
+  .gov-card { box-shadow: none !important; border: 1px solid #bbb !important; }
+}

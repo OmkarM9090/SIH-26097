@@ -1,0 +1,19 @@
+{
+  "header": {
+    "title": "JeevikaSetu",
+    "subtitle": "PM-AJAY • Pradhan Mantri Anusuchit Jaati Abhyuday Yojana",
+    "dashboard_button": "Officials Dashboard"
+  },
+  "landing": {
+    "hero_title": "आपकी भाषा में, आपके हुनर की पहचान",
+    "start_talking": "बात करें",
+    "call_ivr": "Call करें (IVR)",
+    "whatsapp": "WhatsApp"
+  },
+  "voice_conversation": {
+    "listening": "सुन रहे हैं...",
+    "processing": "समझ रहे हैं...",
+    "speaking": "बोल रहे हैं...",
+    "hold_to_speak": "बोलने के लिए दबाएँ"
+  }
+}
