@@ -12,8 +12,20 @@ import { useAppLang } from "@/components/page-shell";
 import { t } from "@/data/i18n";
 import {
   getMicStream, listen, record, speak, stopSpeaking, supportsBrowserSTT,
-  type ListenHandle, type RecorderHandle,
+  tripSpeechBreaker, type ListenHandle, type RecorderHandle,
 } from "@/lib/speech-client";
+import {
+  createOfflineSession, offlineStep, saveLocalProfile, type OfflineSession,
+} from "@/lib/offline-agent";
+import { isForcedMock } from "@/lib/demo-mode";
+
+/** fetch that can never hang the demo */
+async function tfetch(url: string, init: RequestInit, ms = 8000): Promise<Response> {
+  const c = new AbortController();
+  const timer = setTimeout(() => c.abort(), ms);
+  try { return await fetch(url, { ...init, signal: c.signal }); }
+  finally { clearTimeout(timer); }
+}
 
 interface WaMsg {
   id: number;
@@ -42,6 +54,9 @@ export default function WhatsAppClient() {
   const streamRef = useRef<MediaStream | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [browserSTT] = useState(supportsBrowserSTT());
+  // client-side mock engine — keeps the chat alive when the API is down
+  const mockRef = useRef<OfflineSession | null>(null);
+  const offlineRef = useRef(false);
 
   const pushMsg = useCallback((m: Omit<WaMsg, "id" | "at">) => {
     setMsgs((p) => [...p, { ...m, id: idRef.current++, at: now() }]);
@@ -50,27 +65,56 @@ export default function WhatsAppClient() {
 
   const send = useCallback(
     async (text: string, asVoice = false) => {
-      if (!sessionId || !text.trim()) return;
+      if (!text.trim()) return;
+      // optimistic: the voice note appears instantly
       setTyped("");
       pushMsg({ role: "user", text, voice: asVoice });
       setThinking(true);
       try {
-        const res = await fetch("/api/conversation/message", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId, channel: "whatsapp", lang, userText: text }),
-        });
-        const data = (await res.json()) as ConversationReply;
+        let data: ConversationReply | null = null;
+        if (!offlineRef.current && sessionId && !sessionId.startsWith("local-")) {
+          try {
+            const res = await tfetch("/api/conversation/message", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId, channel: "whatsapp", lang, userText: text }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const j = (await res.json()) as ConversationReply & { error?: string };
+            if (j.error || !j.reply) throw new Error(j.error ?? "empty");
+            data = j;
+            if (mockRef.current) {
+              mockRef.current = { ...mockRef.current, slots: j.slots ?? {}, stage: j.stage, done: j.done, lang: j.language };
+            }
+          } catch (e) {
+            offlineRef.current = true;
+            tripSpeechBreaker(String(e));
+          }
+        }
+        if (!data) {
+          mockRef.current ??= createOfflineSession(lang).session;
+          const stepped = offlineStep(mockRef.current, text, lang);
+          mockRef.current = stepped.session;
+          data = stepped.reply;
+          await new Promise((r) => setTimeout(r, 380));
+        }
+
         pushMsg({ role: "ai", text: data.reply, lang: data.language, voice: true });
         if (data.done) {
           setDone(true);
-          const ext = await fetch("/api/profile/extract", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ conversationId: sessionId, lang, channel: "whatsapp" }),
-          });
-          const j = (await ext.json()) as { id?: string };
-          if (j.id) window.localStorage.setItem("js_beneficiary", j.id);
+          let bid: string | null = null;
+          if (!offlineRef.current && sessionId) {
+            try {
+              const ext = await tfetch("/api/profile/extract", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ conversationId: sessionId, lang, channel: "whatsapp" }),
+              });
+              if (ext.ok) bid = ((await ext.json()) as { id?: string }).id ?? null;
+            } catch { /* local fallback */ }
+          }
+          if (!bid) bid = saveLocalProfile(mockRef.current?.slots ?? {}, lang, "whatsapp");
+          window.localStorage.setItem("js_beneficiary", bid);
         }
       } finally {
         setThinking(false);
@@ -82,12 +126,24 @@ export default function WhatsAppClient() {
   // boot: start session + greeting bubble
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/conversation/message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel: "whatsapp", lang }),
-      });
-      const data = (await res.json()) as ConversationReply;
+      const seed = createOfflineSession(lang);
+      mockRef.current = seed.session;
+      let data: ConversationReply = seed.reply;
+      try {
+        if (isForcedMock()) throw new Error("forced mock mode");
+        const res = await tfetch("/api/conversation/message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ channel: "whatsapp", lang }),
+        }, 6000);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const j = (await res.json()) as ConversationReply & { error?: string };
+        if (j.error || !j.reply) throw new Error(j.error ?? "empty");
+        data = j;
+      } catch (e) {
+        offlineRef.current = true;
+        tripSpeechBreaker(String(e));
+      }
       setSessionId(data.id);
       pushMsg({ role: "ai", text: data.reply, lang: data.language, voice: true });
     })();

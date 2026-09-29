@@ -9,6 +9,7 @@ import { profileRadar } from "@/lib/match";
 import { RadarChart } from "@/components/charts";
 import { useAppLang } from "@/components/page-shell";
 import { t } from "@/data/i18n";
+import { isLocalId, readLocalProfile } from "@/lib/offline-agent";
 
 interface ApiResponse {
   beneficiary: { id: string; profile: BeneficiaryProfile; language: LangCode; channel: string; createdAt: string };
@@ -27,6 +28,13 @@ export default function ProfileClient({ id, demo }: { id: string; demo: boolean 
 
   useEffect(() => {
     (async () => {
+      // Offline/mock interview → the profile lives in localStorage only.
+      const local = readLocalProfile(id) as ApiResponse | null;
+      if (isLocalId(id) && local) {
+        setData(local);
+        setProfile(local.beneficiary.profile);
+        return;
+      }
       try {
         const res = await fetch(`/api/beneficiaries/${id}`);
         const j = (await res.json()) as ApiResponse & { error?: string };
@@ -34,6 +42,7 @@ export default function ProfileClient({ id, demo }: { id: string; demo: boolean 
         setData(j);
         setProfile(j.beneficiary.profile);
       } catch (e) {
+        if (local) { setData(local); setProfile(local.beneficiary.profile); return; }
         setLoadErr(String(e));
       }
     })();
@@ -57,11 +66,14 @@ export default function ProfileClient({ id, demo }: { id: string; demo: boolean 
   const generate = useCallback(async () => {
     setBusy(true);
     try {
-      await fetch("/api/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ beneficiaryId: id }),
-      });
+      // best-effort warm-up; the recommendations screen can compute locally too
+      if (!isLocalId(id)) {
+        await fetch("/api/recommend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ beneficiaryId: id }),
+        }).catch(() => undefined);
+      }
       router.push(`/recommendations/${id}${demo ? "?demo=1" : ""}`);
     } finally {
       setBusy(false);

@@ -1,15 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-950: #050d26;
-  --color-navy-900: #0b1e46;
-  --color-navy-850: #102757;
-  --color-navy-800: #14295e;
-  --color-navy-700: #1a2a6b;
-  --color-navy-600: #22367f;
-  --color-navy-500: #2f4596;
-  --color-navy-100: #dfe5f5;
-  --color-navy-50: #eef1fa;
+  /* India.gov.in palette — Deep Blue #003366 + Saffron #FF9933 */
+  --color-navy-950: #00203f;
+  --color-navy-900: #003366;   /* primary deep blue */
+  --color-navy-850: #013b76;
+  --color-navy-800: #014385;
+  --color-navy-700: #0a4d8f;
+  --color-navy-600: #1160a8;
+  --color-navy-500: #2f7ac0;
+  --color-navy-100: #d6e4f2;
+  --color-navy-50: #eaf2f9;
 
   --color-saffron-600: #ea7d12;
   --color-saffron-500: #ff9933;
@@ -31,7 +32,19 @@
 
 html {
   font-family: var(--font-sans);
+  /* NOTE: `scroll-behavior: smooth` is intentionally NOT set here.
+     Next.js warns when smooth scrolling is applied globally without
+     `data-scroll-behavior="smooth"` on <html>; the attribute is set in
+     app/layout.tsx and this rule is scoped to it below. */
+}
+
+html[data-scroll-behavior="smooth"] {
   scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-scroll-behavior="smooth"] { scroll-behavior: auto; }
+  .mic-pulse, .ping-ring::after, .chakra-spin, .soft-float { animation: none !important; }
 }
 
 body {
@@ -166,4 +179,23 @@ html[data-contrast="true"] .soft {
   body { background: #ffffff !important; }
   .no-print { display: none !important; }
   .gov-card { box-shadow: none !important; border: 1px solid #bbb !important; }
+}
+
+/* ------------------------------------------ hold-to-speak recording state */
+@keyframes mic-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  70%  { box-shadow: 0 0 0 22px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+.mic-pulse { animation: mic-pulse 1.25s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+/* ------------------------------------------ gov portal touches */
+.gov-rule {
+  height: 3px;
+  background: linear-gradient(90deg, #FF9933 0 33.3%, #ffffff 33.3% 66.6%, #138808 66.6% 100%);
+}
+
+/* large tap targets for low-literacy / rural users on small screens */
+@media (max-width: 480px) {
+  button { min-height: 44px; }
 }

@@ -12,12 +12,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0b1e46",
+  themeColor: "#003366",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {/* Multilingual Noto family (non-blocking; system fonts as fallback) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

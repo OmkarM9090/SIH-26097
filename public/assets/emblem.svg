@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80" width="64" height="80" role="img" aria-label="State Emblem placeholder">
+  <rect x="24" y="58" width="16" height="4" rx="1" fill="#7a5a2b"/>
+  <rect x="20" y="52" width="24" height="6" rx="2" fill="#977339"/>
+  <circle cx="32" cy="36" r="10" fill="#b9903f"/>
+  <circle cx="20" cy="32" r="6.5" fill="#caa14e"/>
+  <circle cx="44" cy="32" r="6.5" fill="#caa14e"/>
+  <circle cx="32" cy="22" r="7" fill="#d8b15e"/>
+  <circle cx="32" cy="36" r="3" fill="#7a5a2b"/>
+  <text x="32" y="74" text-anchor="middle" font-family="Noto Sans, sans-serif" font-size="7.5" font-weight="700" fill="#003366">सत्यमेव जयते</text>
+</svg>
