@@ -23,3 +23,13 @@ The root `Dockerfile` builds the Next.js standalone server and binds to `0.0.0.0
 Microphone capture requires HTTPS in production (Vercel provides this) and the user must grant microphone permission. The browser records `audio/webm;codecs=opus`, posts it as multipart form data to `/api/voice/transcribe`, and Whisper receives it server-side. If no OpenAI key is configured, the UI falls back to browser speech recognition and speech synthesis, so judges can still walk through the flow.
 
 Never put `OPENAI_API_KEY` or `MONGODB_URL` in `NEXT_PUBLIC_*` variables or commit `.env.local`.
+
+## Live-demo resilience (built in)
+
+The interview is engine-independent, so a live deployment cannot strand a beneficiary mid-conversation:
+
+* **State travels with every turn.** The client posts `slots` and `stage` alongside `sessionId`, and `/api/conversation/message` also accepts turns with no session at all. If MongoDB is briefly unreachable, the session row was evicted, or the request lands on a cold serverless instance that never saw the conversation, the turn is still answered correctly and the session is recreated with the client state.
+* **The deterministic engine owns the flow; GPT-4o only rephrases.** LLM output is validated (language, length, and it must still ask the pending question) — an unusable model reply is discarded and the scripted reply is spoken instead. A model outage can never skip a question or lose an answer.
+* **Speech is browser-native by default.** `window.SpeechRecognition` + `window.speechSynthesis` need no keys, no quota and no network. Server Whisper/TTS is only attempted when `/api/config` reports a live key, and any failure permanently trips a circuit breaker back to the free path — including the OpenAI `insufficient_quota` 429 that used to freeze the demo.
+* **The greeting is spoken from the client.** The first audio happens inside the user's tap, which is what iOS/Safari require; the server session is created in the background.
+* **Final profile always exists.** If `/api/profile/extract` cannot persist (no DB), the profile is stored in `localStorage` and `/profile/[id]` + `/recommendations/[id]` still render it.

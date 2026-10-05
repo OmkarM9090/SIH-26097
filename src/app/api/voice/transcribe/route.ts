@@ -16,9 +16,13 @@ export async function POST(req: Request) {
     if (!(audio instanceof Blob)) {
       return Response.json({ error: "audio file required" }, { status: 400 });
     }
+    const LANG_OK = ["hi", "en", "ta", "te", "mr", "bn"] as const;
+    type L = (typeof LANG_OK)[number];
+    const hint = LANG_OK.includes(requestedLanguage as L) ? (requestedLanguage as L) : undefined;
     // Whisper accepts the browser's WebM/Opus blob directly; do not attempt
-    // to parse it as text or convert it in the browser.
-    const result = await whisperTranscribe(audio, "speech.webm");
+    // to parse it as text or convert it in the browser. The language hint
+    // greatly improves accuracy for Indic scripts.
+    const result = await whisperTranscribe(audio, "speech.webm", hint);
     if (!result) return Response.json({ error: "transcription failed" }, { status: 502 });
     return Response.json({
       text: result.text,

@@ -12,7 +12,7 @@
 // import from a "use client" component.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { ConversationReply, LangCode, SlotState, Stage } from "@/lib/types";
-import { fallbackStep, greeting, stageProgress, buildProfile } from "@/lib/conversation";
+import { fallbackStep, greeting, stageProgress, buildProfile, currentQuestion } from "@/lib/conversation";
 import { QUESTIONS } from "@/data/i18n";
 
 export interface OfflineSession {
@@ -81,6 +81,8 @@ export function offlineStep(
       done: step.done,
       slots: step.slots,
       aiPowered: false,
+      intent: step.intent,
+      retry: step.retry,
     },
   };
 }
@@ -90,6 +92,11 @@ export function offlineQuestionFor(stage: Stage, lang: LangCode): string | undef
   if (stage === "done") return undefined;
   const q = QUESTIONS[stage as Exclude<Stage, "done">];
   return q?.[lang] ?? q?.en;
+}
+
+/** The full pending question (including the recap at the confirm stage). */
+export function pendingQuestion(slots: SlotState, stage: Stage, lang: LangCode): string {
+  return currentQuestion(slots, stage, lang);
 }
 
 // ───────────────────────────────────────────────────── local profile storage

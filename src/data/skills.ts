@@ -69,6 +69,44 @@ export const SKILLS: SkillEntry[] = [
     kw: ["security", "guard", "chowkidar", "watchman", "सिक्योरिटी", "चौकीदार"] },
 ];
 
+// Extra keywords for Tamil / Telugu / Bengali / Marathi speakers, plus common
+// Hinglish variants. Merged into the lexicon so a beneficiary who says
+// "தையல் வேலை" or "కుట్టు పని" is recognised exactly like one who says "सिलाई".
+const EXTRA_KW: Record<string, string[]> = {
+  tailoring: ["தையல்", "తையൽ", "కుట్టు", "সেলাই", "শিলাই", "शिवणकाम", "शिलाई"],
+  leather_work: ["தோல்", "చర్మం", "চামড়া", "चामड़ा", "चर्मकार"],
+  leather_stitching: ["தோல் வேலை", "చర్మపు పని", "চামড়ার কাজ", "चर्मकाम"],
+  embroidery: ["கைவேலை", "எம்பிராய்டரி", "ఎంబ్రాయిడరీ", "সূচিকর্ম", "भरतकाम", "কাঁথা"],
+  weaving: ["நெசவு", "నేత", "বুনন", "তাঁত", "विणकाम", "माग"],
+  pottery: ["மண்பாண்டம்", "కుండలు", "మట్టి", "মৃৎশিল্প", "মাটি", "कुंभार", "माती"],
+  bamboo_craft: ["மூங்கில்", "వెదురు", "বাঁশ", "बांबू", "वेत"],
+  masonry: ["கட்டுமான", "செங்கல்", "కట్టడం", "ఇటుక", "রাজমিস্ত্রি", "ইট", "गवंडी", "बांधकाम"],
+  bar_bending: ["இரும்பு", "ఇనుప", "রড", "सरिया"],
+  painting: ["வண்ணம்", "பெயிண்ட்", "రంగు", "పెయింట్", "রং", "পেইন্ট", "रंगकाम"],
+  plumbing: ["குழாய்", "ప్లంబింగ్", "పైపు", "প্লাম্বিং", "নল", "नळ"],
+  electrician: ["மின்சாரம்", "విద్యుత్", "বিদ্যুৎ", "ইলেকট্রিক", "विज", "इलेक्ट्रिक"],
+  mobile_repair: ["மொபைல்", "మొబైల్", "মোবাইল", "मोबाइल"],
+  computer: ["கணினி", "కంప్యూటర్", "কম্পিউটার", "संगणक"],
+  driving: ["ஓட்டுநர்", "ஓட்டு", "డ్రైవింగ్", "నడపడం", "ড্রাইভিং", "চালানো", "ड्रायव्हिंग", "चालवणे"],
+  auto_repair: ["மெக்கானிக்", "మెకానిక్", "মেকানিক", "मेकॅनिक", "गाडी दुरुस्ती"],
+  welding: ["வெல்டிங்", "వెల్డింగ్", "ওয়েল্ডিং", "वेल्डिंग"],
+  carpentry: ["தச்சு", "వడ్రంగి", "কাঠ", "সূত্রধর", "सुतार", "लाकूड"],
+  farming: ["விவசாயம்", "வேளாண்மை", "நெல்", "వ్యవసాయం", "పొలం", "কৃষি", "চাষ", "ধান", "शेती", "पीक", "शेत"],
+  dairy: ["பால்", "மாடு", "పాలు", "ఆవు", "দুধ", "গরু", "दूध", "गाय", "म्हैस"],
+  poultry: ["கோழி", "కోళ్ల", "మురుగు", "মুরগি", "মুরগী", "হাঁস", "कोंबडी", "मुर्गी"],
+  food_processing: ["ஊறுகாய்", "அப்பளம்", "పచ్చడి", "అప్పడం", "আচার", "পাপড়", "लोणचे", "पापड", "अचार", "मसाला"],
+  cooking: ["சமையல்", "వంట", "রান্না", "स्वयंपाक", "खाना बनाना"],
+  housekeeping: ["சுத்தம்", "வீட்டு வேலை", "శుభ్రత", "ఇంటి పని", "পরিষ্কার", "ঝি", "घरकाम", "स्वच्छता"],
+  beauty: ["அழகு", "முடி", "క్షవరం", "అందం", "সৌন্দর্য", "চুল", "সেলুন", "केशकर्तन", "सौंदर्य"],
+  healthcare: ["மருத்துவம்", "சிகிச்சை", "వైద్యం", "ఆసుపత్రి", "চিকিৎসা", "হাসপাতাল", "औषध", "रुग्णालय"],
+  retail: ["கடை", "விற்பனை", "దుకాణం", "అమ్మకం", "দোকান", "বিক্রি", "दुकान", "विक्री"],
+  security: ["பாதுகாப்பு", "காவல்", "భద్రత", "కాపలా", "নিরাপত্তা", "পাহারা", "पहारा", "सुरक्षा"],
+};
+for (const sk of SKILLS) {
+  const extra = EXTRA_KW[sk.id];
+  if (extra) sk.kw = [...sk.kw, ...extra];
+}
+
 export const SKILL_MAP = new Map(SKILLS.map((s) => [s.id, s]));
 
 /** Scan free text (any language mix) and return matched canonical skill ids. */
@@ -95,14 +133,20 @@ export const EDU_LEVELS: { rank: number; label: string; labelHi: string }[] = [
 export function parseEducation(text: string): { rank: number; label: string } {
   const lower = text.toLowerCase();
   const has = (...ks: string[]) => ks.some((k) => lower.includes(k));
-  if (has("graduat", "b.a", "ba ", "bsc", "b.com", "degree", "स्नातक", "ग्रेजुएट", "डिग्री")) return { rank: 6, label: EDU_LEVELS[6].label };
-  if (has("iti", "आईटीआई", "diploma", "polytechnic", "डिप्लोमा")) return { rank: 5, label: EDU_LEVELS[5].label };
-  if (has("12", "twelv", "inter", "बारह", "12वीं", "१२")) return { rank: 4, label: EDU_LEVELS[4].label };
-  if (has("10", "tenth", "dasvi", "मैट्रिक", "दसवीं", "10वीं", "१०", "sslc")) return { rank: 3, label: EDU_LEVELS[3].label };
-  if (has("8", "eighth", "aathvi", "8वीं", "आठवीं", "८")) return { rank: 2, label: EDU_LEVELS[2].label };
-  if (has("5", "fifth", "pachvi", "5वीं", "पाँचवी", "५", "primary", "प्राइमरी")) return { rank: 1, label: EDU_LEVELS[1].label };
-  if (has("nahi padh", "unpadh", "illiterate", "no school", "नहीं पढ़", "अनपढ़", "पढ़ाई नहीं")) return { rank: 0, label: EDU_LEVELS[0].label };
+  if (has("graduat", "b.a", "ba ", "bsc", "b.com", "degree", "स्नातक", "ग्रेजुएट", "डिग्री", "पदवी", "பட்டதாரி", "பட்டம்", "డిగ్రీ", "పట్టభద్ర", "স্নাতক", "ডিগ্রি")) return { rank: 6, label: EDU_LEVELS[6].label };
+  if (has("iti", "आईटीआई", "diploma", "polytechnic", "डिप्लोमा", "आयटीआय", "டிப்ளமோ", "டிப்லோமா", "డిప్లొమా", "ఐటీఐ", "ডিপ্লোমা", "আইটিআই")) return { rank: 5, label: EDU_LEVELS[5].label };
+  if (has("12", "twelv", "inter", "बारह", "12वीं", "१२", "बारावी", "பன்னிரண்டாம்", "పన్నెండవ", "দ্বাদশ")) return { rank: 4, label: EDU_LEVELS[4].label };
+  if (has("10", "tenth", "dasvi", "मैट्रिक", "दसवीं", "10वीं", "१०", "sslc", "दहावी", "பத்தாம்", "పదవ", "দশম")) return { rank: 3, label: EDU_LEVELS[3].label };
+  if (has("8", "eighth", "aathvi", "8वीं", "आठवीं", "८", "आठवी", "எட்டாம்", "ఎనిమిదవ", "অষ্টম")) return { rank: 2, label: EDU_LEVELS[2].label };
+  if (has("5", "fifth", "pachvi", "5वीं", "पाँचवी", "५", "primary", "प्राइमरी", "पाचवी", "ஐந்தாம்", "ఐదవ", "পঞ্চম")) return { rank: 1, label: EDU_LEVELS[1].label };
+  if (has("nahi padh", "unpadh", "illiterate", "no school", "नहीं पढ़", "अनपढ़", "पढ़ाई नहीं", "படிக்கவில்லை", "చదవలేదు", "পড়িনি")) return { rank: 0, label: EDU_LEVELS[0].label };
   return { rank: 2, label: EDU_LEVELS[2].label };
+}
+
+/** True when the sentence actually names a schooling level (avoids defaulting). */
+export function hasEducationSignal(text: string): boolean {
+  const e = parseEducation(text);
+  return /(\d|पढ़|padh|school|स्कूल|college|iti|diploma|graduat|pass|पास|मैट्रिक|class|वर्ग|வகுப்பு|படித்|తరగతి|చది|শ্রেণি|পড়াশোনা)/i.test(text) || e.rank !== 2;
 }
 
 // --------------------------------------------------------------- locations
@@ -147,9 +191,13 @@ export function extractVillage(text: string): string | undefined {
 
 // ----------------------------------------------------------- name cleanup
 const NAME_STOP = new Set([
-  "mera", "meri", "naam", "name", "is", "hai", "hun", "hu", "main", "mei", "may", "ji",
-  "नाम", "मेरा", "मेरी", "है", "हूं", "हूँ", "मैं", "मै", "नाव", "माझे", "పేరు", "నేను",
-  "பெயர்", "নাম", "আমার", "ahiyaan", "myself", "i", "am", "bol", "rah", "rhi", "rhi",
+  "mera", "meri", "mere", "naam", "name", "is", "hai", "hun", "hu", "main", "mei", "may", "ji",
+  "ahiyaan", "myself", "i", "am", "bol", "rah", "rhi", "rha", "bolta", "bolti", "kehta", "kehti",
+  "नाम", "मेरा", "मेरी", "मेरे", "है", "हूं", "हूँ", "मैं", "मै", "जी", "बोलता", "बोलती", "कहता", "कहती",
+  "नाव", "माझे", "माझा", "मी", "आहे", "बोलतो", "म्हणतो",
+  "పేరు", "నేను", "నా", "అని", "ఉంది",
+  "பெயர்", "என்", "எனது", "நான்", "என்று",
+  "নাম", "আমার", "আমি", "বলছি", "নামের",
 ]);
 
 export function cleanName(text: string): string {
@@ -189,8 +237,19 @@ export function parseMobility(text: string): number {
 
 export function parseConstraints(text: string): string {
   const lower = text.toLowerCase();
-  if (/(nahi|no |^no|koi nahi|नहीं|இல்லை|లేదు|नाही|না|none|fit|theek)/.test(lower)) return "None";
+  if (/(nahi|no |^no|koi nahi|कोई नहीं|कुछ नहीं|नहीं|இல்லை|లేదు|नाही|না|none)/.test(lower)) return "None";
+  if (/(theek|thik|sahi|bilkul|haan|हाँ|हां|ठीक|सही|बिल्कुल|சரி|ஆம்|అవును|సరే|ঠিক|হ্যাঁ|हो)/.test(lower)) return "None";
+  const m = lower.match(/(dikkat|problem|pareshani|takleef|दिक्कत|समस्या|परेशानी|तकलीफ|பிரச்சனை|சிரமம்|ఇబ్బంది|సమస్య|সমস্যা|কষ্ট)/);
+  if (!m) return "None";     // nothing recognisable → treat as no constraint
   return text.trim();
+}
+
+/** True when the sentence is only an affirmation ("haan", "theek hai", "sari"). */
+export function isBareAffirm(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (!t) return false;
+  if (t.split(/\s+/).length > 3) return false;
+  return /(haan|han|ha|yes|ok|okay|theek|thik|sahi|bilkul|zaroor|हाँ|हां|ठीक|सही|बिल्कुल|ज़रूर|हो|ஆம்|சரி|అవును|సరే|হ্যাঁ|ঠিক)/.test(t);
 }
 
 export function parseAge(text: string): number | undefined {

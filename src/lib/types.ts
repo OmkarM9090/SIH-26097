@@ -43,12 +43,16 @@ export interface SlotState {
   currentSkills?: string[];
   interests?: string[];       // canonical skill ids / sector tags
   interestLabels?: string[];  // readable labels
+  interestNote?: string;      // the beneficiary's own words (spoken back for ta/te/bn)
   preference?: "self" | "wage" | "either";
   mobilityKm?: number;
   constraints?: string;
   languages?: string[];
   work_independence?: string;
   insights?: string;
+  /** bookkeeping for the agent: which stage was last asked + how many re-asks */
+  asked_stage?: Stage;
+  asked_count?: number;
 }
 
 /** Final structured beneficiary profile (Module 3 output). */
@@ -167,4 +171,8 @@ export interface ConversationReply {
   done: boolean;
   slots: SlotState;
   aiPowered: boolean;
+  /** what kind of turn was just handled (answer / question / repeat / …) */
+  intent?: string;
+  /** the agent re-asked the same question — no progress this turn */
+  retry?: boolean;
 }
