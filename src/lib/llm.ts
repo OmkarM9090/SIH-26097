@@ -2,9 +2,7 @@
 // Every function degrades gracefully to `null` when no OPENAI_API_KEY is
 // configured, letting the deterministic pipeline take over (demo-safe).
 import type { LangCode, SlotState, Stage, ChatTurn } from "@/lib/types";
-import { STAGES } from "@/lib/conversation";
-import fs from "fs";
-import path from "path";
+import { CONVERSATION_SYSTEM_PROMPT } from "@/data/prompts";
 
 const KEY = () => process.env.OPENAI_API_KEY ?? "";
 export const hasOpenAI = () => Boolean(KEY());
@@ -22,7 +20,7 @@ async function ofetch(path: string, init: RequestInit, timeoutMs = 25000): Promi
       headers: { Authorization: `Bearer ${KEY()}`, ...(init.headers ?? {}) },
     });
     if (!res.ok) {
-      console.error("OpenAI Error:", res.status, await res.text());
+      console.error("OpenAI Error:", res.status, (await res.text()).slice(0, 300));
       return null;
     }
     return res;
@@ -43,32 +41,46 @@ export interface LLMStep {
   finished?: boolean;
 }
 
-let SYSTEM = "";
-try {
-  SYSTEM = fs.readFileSync(path.join(process.cwd(), "src/data/conversation_system_prompt.txt"), "utf-8");
-} catch (e) {
-  console.error("Could not load system prompt:", e);
-}
+// The prompt is imported (not read from disk) so it survives bundling.
+const SYSTEM = CONVERSATION_SYSTEM_PROMPT;
 
+/**
+ * Phrase ONE interview turn.
+ *
+ * `suggestedReply` is the deterministic reply (acknowledgement + the exact next
+ * question). The model is told to keep that meaning — it may warm up the
+ * wording, mirror the beneficiary's dialect, answer an interrupting question
+ * first, and must always finish by asking the same question. The route then
+ * verifies the result before it is spoken, so the interview flow is safe even
+ * if the model misbehaves.
+ */
 export async function llmStep(
   slots: SlotState,
   stage: Stage,
   userText: string,
   transcript: ChatTurn[],
+  suggestedReply?: string,
 ): Promise<LLMStep | null> {
+  const lastUserTurns = transcript.filter((t) => t.role === "user").slice(-4).map((t) => t.text);
   const payload = {
     current_stage: stage,
     collected_slots: slots,
     user_said: userText,
-    recent_transcript: transcript.slice(-6).map((t) => `${t.role}: ${t.text}`),
+    recent_user_answers: lastUserTurns,
+    deterministic_draft_reply: suggestedReply ?? "",
+    instruction:
+      "Rewrite deterministic_draft_reply so it sounds like a warm human field worker on a phone call. " +
+      "Keep every fact and the SAME final question. Reply in the beneficiary's language. Max 2 short sentences.",
   };
+
   for (const model of ["gpt-4o", "gpt-4o-mini"]) {
     const res = await ofetch("/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
-        temperature: 0.6,
+        temperature: 0.7,
+        max_tokens: 260,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: SYSTEM },
@@ -123,13 +135,19 @@ export async function llmStep(
 }
 
 // ------------------------------------------------------------------ Whisper
-export async function whisperTranscribe(audio: Blob, filename: string): Promise<{ text: string; language?: string } | null> {
+export async function whisperTranscribe(
+  audio: Blob,
+  filename: string,
+  language?: LangCode,
+): Promise<{ text: string; language?: string } | null> {
   const form = new FormData();
   const buffer = await audio.arrayBuffer();
   const fileBlob = new Blob([buffer], { type: audio.type });
   form.append("file", fileBlob, filename);
   form.append("model", "whisper-1");
   form.append("response_format", "json");
+  // The language hint measurably improves Indic-script accuracy.
+  if (language) form.append("language", language);
   const res = await ofetch("/audio/transcriptions", { method: "POST", body: form }, 30000);
   if (!res) return null;
   try {
@@ -142,19 +160,57 @@ export async function whisperTranscribe(audio: Blob, filename: string): Promise<
 }
 
 // ------------------------------------------------------------------ TTS
-export async function openAITTS(text: string, _lang: LangCode): Promise<ArrayBuffer | null> {
-  const res = await ofetch(
+/**
+ * Natural, human-sounding voice for the spoken channels. `gpt-4o-mini-tts`
+ * accepts delivery instructions ("warm Indian field worker, unhurried"), which
+ * sounds far more human than the flat tts-1 voices; tts-1 is the fallback for
+ * keys/orgs without the newer model.
+ */
+export async function openAITTS(text: string, lang: LangCode): Promise<ArrayBuffer | null> {
+  const input = text.slice(0, 900);
+  const instructions =
+    "Speak like a warm, patient female government field worker from India talking to a rural beneficiary on a phone call. " +
+    "Unhurried, clear, caring, natural pauses. Never robotic or salesy.";
+
+  const modern = await ofetch(
     "/audio/speech",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "tts-1", voice: "nova", input: text.slice(0, 900), response_format: "mp3" }),
+      body: JSON.stringify({
+        model: "gpt-4o-mini-tts",
+        voice: "shimmer",
+        input,
+        instructions,
+        response_format: "mp3",
+      }),
     },
     25000,
   );
-  if (!res) return null;
+  if (modern) {
+    try {
+      return await modern.arrayBuffer();
+    } catch { /* fall through */ }
+  }
+
+  const legacy = await ofetch(
+    "/audio/speech",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "tts-1",
+        voice: lang === "en" ? "nova" : "shimmer",
+        input,
+        speed: 0.95,
+        response_format: "mp3",
+      }),
+    },
+    25000,
+  );
+  if (!legacy) return null;
   try {
-    return await res.arrayBuffer();
+    return await legacy.arrayBuffer();
   } catch {
     return null;
   }

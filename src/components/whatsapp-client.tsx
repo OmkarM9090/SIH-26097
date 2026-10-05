@@ -154,6 +154,7 @@ export default function WhatsAppClient() {
   const startVoice = async () => {
     if (browserSTT) {
       const handle = listen(lang, {
+        firstFinalOnly: true,   // one voice note = one answer
         onFinal: (tx) => { setRecording(false); void send(tx, true); },
         onEnd: () => setRecording(false),
         onError: () => setRecording(false),
